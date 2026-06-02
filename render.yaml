@@ -1,0 +1,19 @@
+# Render Blueprint — deploys the FastAPI backend (free tier).
+# In Render: New + → Blueprint → pick this repo. Then set the secret env vars.
+services:
+  - type: web
+    name: bus-app-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # paste the Supabase Postgres URI in the dashboard
+      - key: BUS_USERS
+        sync: false
+      - key: BUS_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false          # your Vercel URL, e.g. https://bus-app.vercel.app
