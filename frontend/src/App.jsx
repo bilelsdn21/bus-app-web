@@ -4,6 +4,7 @@ import DayEntry from "./components/DayEntry.jsx";
 import ContractsView from "./components/ContractsView.jsx";
 import SettingsView from "./components/SettingsView.jsx";
 import Login from "./components/Login.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 export default function App() {
   const [auth, setAuth] = useState(() => {
@@ -44,10 +45,12 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
-        {mode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
-        {mode === "contracts" && <ContractsView />}
-        {mode === "entry" && <DayEntry />}
-        {mode === "settings" && <SettingsView />}
+        <ErrorBoundary key={mode}>
+          {mode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
+          {mode === "contracts" && <ContractsView />}
+          {mode === "entry" && <DayEntry />}
+          {mode === "settings" && <SettingsView />}
+        </ErrorBoundary>
       </main>
     </div>
   );

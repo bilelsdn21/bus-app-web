@@ -53,8 +53,8 @@ function BusesPanel() {
               <tr key={b.id} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-semibold text-slate-700">{b.name}</td>
                 <td>{b.type}</td><td>{b.region}</td>
-                <td className="text-right">{b.loyer.toLocaleString("fr-FR")}</td>
-                <td className="text-right">{b.distance ? b.distance.toLocaleString("fr-FR") + " km" : "—"}</td>
+                <td className="text-right">{Number(b.loyer || 0).toLocaleString("fr-FR")}</td>
+                <td className="text-right">{b.distance ? Number(b.distance).toLocaleString("fr-FR") + " km" : "—"}</td>
                 <td className="whitespace-nowrap pr-3 text-right">
                   <button onClick={() => setForm({ ...b })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
                   <button onClick={() => del(b)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>

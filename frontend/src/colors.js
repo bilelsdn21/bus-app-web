@@ -7,5 +7,7 @@ export const DOT = {
   red:    { bg: "bg-rose-500",    ring: "bg-rose-100",    label: "Indisponible",      emoji: "🔴" },
 };
 
-export const fmtTND = (n) =>
-  (n < 0 ? "-" : "") + Math.abs(Math.round(n)).toLocaleString("fr-FR") + " TND";
+export const fmtTND = (n) => {
+  const v = Number(n) || 0;
+  return (v < 0 ? "-" : "") + Math.abs(Math.round(v)).toLocaleString("fr-FR") + " TND";
+};
