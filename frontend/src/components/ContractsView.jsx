@@ -22,7 +22,7 @@ export default function ContractsView() {
       .then(([c, f]) => { setContracts(c); setFuel(f); })
       .catch((e) => setErr(e.message));
   };
-  useEffect(reload, [busId]);
+  useEffect(() => { reload(); }, [busId]);
 
   const saveContract = async () => {
     setErr("");

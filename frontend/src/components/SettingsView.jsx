@@ -26,7 +26,7 @@ function BusesPanel() {
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
   const load = () => api.buses().then(setBuses).catch((e) => setErr(e.message));
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const save = async () => {
     setErr("");
@@ -86,7 +86,7 @@ function DestsPanel() {
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
   const load = () => api.destinations().then(setDests).catch((e) => setErr(e.message));
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
   const save = async () => {
     setErr("");
     try {
