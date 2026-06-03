@@ -36,8 +36,11 @@ def get_period(heure: str, cut_morn: int, cut_night: int) -> int:
 
 def day_color(day_bookings, cut_morn=13, cut_night=22) -> str:
     """
-    Mirror of the Excel dot logic. Returns one of:
-      "" | red | green | yellow | orange | purple
+    Day dot color. Returns one of: "" | red | green | yellow | orange | purple
+      - red    : unavailable only
+      - green  : RESERVED — a multi-day excursion covers this day, OR
+                 two+ excursions fall in different time periods
+      - yellow/orange/purple : a single time period (matin / soir / nuit)
     """
     books = [b for b in day_bookings if b.get("type") == "Booking"]
     unavail = [b for b in day_bookings if b.get("type") != "Booking"]
@@ -45,10 +48,14 @@ def day_color(day_bookings, cut_morn=13, cut_night=22) -> str:
         return ""
     if unavail and not books:
         return "red"
+    # a multi-day excursion reserves the whole span -> green
+    if any(b.get("multi") for b in books):
+        return "green"
+    # two+ excursions in different periods -> green
     periods = {get_period(b.get("heure_debut", ""), cut_morn, cut_night) for b in books}
     periods.discard(UNKNOWN)
     if len(periods) > 1:
-        return "green"                      # spans different periods
+        return "green"
     p = next(iter(periods)) if periods else UNKNOWN
     return {MORNING: "yellow", EVENING: "orange", NIGHT: "purple"}.get(p, "green")
 
