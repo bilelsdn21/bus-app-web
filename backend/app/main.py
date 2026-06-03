@@ -329,7 +329,7 @@ def calendar(year: int, month: int, db: Session = Depends(get_db)):
     sum_rows = []   # for region summary (contract-aware)
     for bus in buses:
         bd = {"id": bus.id, "name": bus.name, "type": bus.type, "region": bus.region,
-              "loyer": bus.loyer, "distance": bus.distance}
+              "distance": bus.distance}
         days = {}
         for day in range(1, end.day + 1):
             ds = date(year, month, day).isoformat()
@@ -358,10 +358,9 @@ def calendar(year: int, month: int, db: Session = Depends(get_db)):
             })
             sum_rows.append({"region": bus.region or "—", "loyer": res["loyer"], "net": res["net"]})
         else:
-            # no contract yet -> simple month net (revenue this month - default loyer, no fuel)
-            net = calc.bus_net({"id": bus.id, "loyer": bus.loyer}, book_dicts)
-            bd.update({"net": net, "pct": calc.pct(net, bus.loyer), "is_estimated": False, "contract": None})
-            sum_rows.append({"region": bus.region or "—", "loyer": bus.loyer, "net": net})
+            # no contract covering this month -> nothing to compute (rent lives on contracts)
+            bd.update({"net": None, "pct": "—", "is_estimated": False, "contract": None, "no_contract": True})
+            sum_rows.append({"region": bus.region or "—", "loyer": 0.0, "net": 0.0})
 
         bus_list.append(bd)
 

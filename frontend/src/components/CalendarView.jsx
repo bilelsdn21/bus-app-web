@@ -102,12 +102,16 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                           );
                         })}
                         <td className="px-3 py-1.5 text-right">
-                          <span className={`rounded-md px-2 py-0.5 font-bold ${net >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
-                            {fmtTND(net)}
-                          </span>
+                          {net == null ? (
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-400" title="Aucun contrat pour ce mois">Pas de contrat</span>
+                          ) : (
+                            <span className={`rounded-md px-2 py-0.5 font-bold ${net >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                              {fmtTND(net)}
+                            </span>
+                          )}
                           {bus.is_estimated && <span className="ml-1 align-middle text-[9px] font-bold uppercase text-amber-500" title="Carburant estimé">est</span>}
                         </td>
-                        <td className={`px-3 py-1.5 text-center font-semibold ${net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{bus.pct}</td>
+                        <td className={`px-3 py-1.5 text-center font-semibold ${net == null ? "text-slate-300" : net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{bus.pct}</td>
                         <td className="px-3 py-1.5 text-right text-slate-500">{bus.distance > 0 ? `${bus.distance.toLocaleString("fr-FR")} km` : "—"}</td>
                       </tr>
                     </>

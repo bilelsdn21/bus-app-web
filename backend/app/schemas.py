@@ -5,12 +5,12 @@ from pydantic import BaseModel, ConfigDict
 
 
 # ---- Bus ----
+# Rent (loyer) is NOT here — it lives on the contract, per period.
 class BusBase(BaseModel):
     name: str
     plate: Optional[str] = ""
     type: str = "MICRO"
     region: str = ""
-    loyer: float = 0.0
     distance: float = 0.0
 
 class BusCreate(BusBase):

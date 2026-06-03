@@ -32,7 +32,7 @@ function BusesPanel() {
     setErr("");
     try {
       const p = { name: form.name, type: form.type, region: form.region,
-        loyer: Number(form.loyer) || 0, distance: Number(form.distance) || 0, plate: form.plate || "" };
+        distance: Number(form.distance) || 0, plate: form.plate || "" };
       if (form.id) await api.updateBus(form.id, p); else await api.createBus(p);
       setForm(null); load();
     } catch (e) { setErr(e.message); }
@@ -42,18 +42,18 @@ function BusesPanel() {
   return (
     <div className="space-y-3">
       {err && <Err msg={err} />}
-      <button onClick={() => setForm({ name: "", type: "BUS", region: "Sousse", loyer: 0, distance: 0, plate: "" })} className={btnPrimary}>+ Véhicule</button>
+      <button onClick={() => setForm({ name: "", type: "BUS", region: "Sousse", distance: 0, plate: "" })} className={btnPrimary}>+ Véhicule</button>
+      <p className="text-xs text-slate-400">💡 Le loyer se définit par <b>contrat</b> (onglet Contrats), pas sur le véhicule.</p>
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
         <table className="w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
-            <th className="px-3 py-2">Nom</th><th>Type</th><th>Région</th><th className="text-right">Loyer</th><th className="text-right">Distance</th><th></th>
+            <th className="px-3 py-2">Nom</th><th>Type</th><th>Région</th><th className="text-right">Distance</th><th></th>
           </tr></thead>
           <tbody>
             {buses.map((b) => (
               <tr key={b.id} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-semibold text-slate-700">{b.name}</td>
                 <td>{b.type}</td><td>{b.region}</td>
-                <td className="text-right">{Number(b.loyer || 0).toLocaleString("fr-FR")}</td>
                 <td className="text-right">{b.distance ? Number(b.distance).toLocaleString("fr-FR") + " km" : "—"}</td>
                 <td className="whitespace-nowrap pr-3 text-right">
                   <button onClick={() => setForm({ ...b })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
@@ -71,10 +71,7 @@ function BusesPanel() {
             <L label="Type"><select className={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select></L>
             <L label="Région"><select className={inp} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>{REGIONS.map((r) => <option key={r}>{r}</option>)}</select></L>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <L label="Loyer (TND)"><input type="number" className={inp} value={form.loyer} onChange={(e) => setForm({ ...form, loyer: e.target.value })} /></L>
-            <L label="Distance (km)"><input type="number" className={inp} value={form.distance} onChange={(e) => setForm({ ...form, distance: e.target.value })} /></L>
-          </div>
+          <L label="Distance (km / mois)"><input type="number" className={inp} value={form.distance} onChange={(e) => setForm({ ...form, distance: e.target.value })} /></L>
         </Modal>
       )}
     </div>

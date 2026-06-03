@@ -56,7 +56,7 @@ export default function ContractsView({ readOnly = false }) {
           {buses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         {!readOnly && (
-          <button onClick={() => setForm({ start_date: "", end_date: "", loyer: bus?.loyer || 0, label: "" })}
+          <button onClick={() => setForm({ start_date: "", end_date: "", loyer: contracts[0]?.loyer || 0, label: "" })}
             className="rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-white shadow hover:bg-[#234d77]">
             + Nouveau contrat
           </button>
