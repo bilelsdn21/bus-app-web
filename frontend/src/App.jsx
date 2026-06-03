@@ -3,6 +3,7 @@ import CalendarView from "./components/CalendarView.jsx";
 import DayEntry from "./components/DayEntry.jsx";
 import ContractsView from "./components/ContractsView.jsx";
 import SettingsView from "./components/SettingsView.jsx";
+import JournalView from "./components/JournalView.jsx";
 import Login from "./components/Login.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -25,7 +26,7 @@ export default function App() {
 
   // tabs allowed per role
   const tabs = isAdmin
-    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"]]
+    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"], ["journal", "🧾 Journal"]]
     : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"]];
 
   // if a viewer somehow has an admin-only mode selected, fall back to calendar
@@ -59,6 +60,7 @@ export default function App() {
           {effMode === "contracts" && <ContractsView readOnly={!isAdmin} />}
           {effMode === "entry" && <DayEntry />}
           {effMode === "settings" && <SettingsView />}
+          {effMode === "journal" && <JournalView />}
         </ErrorBoundary>
       </main>
     </div>

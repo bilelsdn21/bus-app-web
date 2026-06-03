@@ -2,8 +2,9 @@
 ORM models. Mirrors the Excel structure but with proper relations, so a booking
 references a bus by FK (id) — no more silent name-mismatch lost revenue.
 """
+from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, Date, ForeignKey, Text, UniqueConstraint
+    Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -82,3 +83,15 @@ class Config(Base):
     id         = Column(Integer, primary_key=True)
     cut_morn   = Column(Integer, default=13)   # morning/evening boundary (h)
     cut_night  = Column(Integer, default=22)   # evening/night boundary (h)
+
+
+class AuditLog(Base):
+    """Who did what, when — one row per write action by an admin."""
+    __tablename__ = "audit_log"
+    id         = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    username   = Column(String, index=True)
+    method     = Column(String)   # POST / PUT / DELETE
+    path       = Column(String)   # /api/excursions/5 ...
+    status     = Column(Integer)  # HTTP status returned
+    detail     = Column(Text, default="")

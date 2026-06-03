@@ -5,13 +5,13 @@ Run:  uvicorn app.main:app --reload --port 8000
 import os
 import hashlib
 from datetime import date, timedelta
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from .database import Base, engine, get_db
+from .database import Base, engine, get_db, SessionLocal
 from . import models, schemas, calc
 
 # Credential + role store. Each entry: "user:password:role" (role = admin | viewer).
@@ -35,12 +35,15 @@ def _token(username: str) -> str:
     secret = os.environ.get("BUS_SECRET", "bus-local-secret")
     return hashlib.sha256(f"{username}:{secret}".encode()).hexdigest()
 
-# token -> role, for verifying requests
+# token -> role, and token -> username, for verifying + auditing requests
 TOKENS = {_token(u): info["role"] for u, info in USERS.items()}
+TOKEN_USER = {_token(u): u for u in USERS}
+
+def _bearer(authorization: str | None) -> str:
+    return authorization[7:] if authorization and authorization.lower().startswith("bearer ") else ""
 
 def _role_of(authorization: str | None) -> str | None:
-    tok = authorization[7:] if authorization and authorization.lower().startswith("bearer ") else ""
-    return TOKENS.get(tok)
+    return TOKENS.get(_bearer(authorization))
 
 def require_admin(authorization: str = Header(None)):
     """Allow only admin tokens through. Used on every write endpoint."""
@@ -69,6 +72,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def audit_middleware(request: Request, call_next):
+    """Record every successful write (POST/PUT/DELETE) with the acting username."""
+    response = await call_next(request)
+    try:
+        path = request.url.path
+        if (request.method in ("POST", "PUT", "DELETE")
+                and path.startswith("/api") and path != "/api/login"
+                and 200 <= response.status_code < 300):
+            user = TOKEN_USER.get(_bearer(request.headers.get("authorization", "")))
+            if user:
+                db = SessionLocal()
+                try:
+                    db.add(models.AuditLog(username=user, method=request.method,
+                                           path=path, status=response.status_code))
+                    db.commit()
+                finally:
+                    db.close()
+    except Exception:
+        pass  # never let logging break a request
+    return response
 
 
 def get_config(db: Session) -> models.Config:
@@ -102,6 +128,16 @@ def login(body: LoginBody):
     if not info or info["password"] != body.password:
         raise HTTPException(401, "Identifiants incorrects.")
     return {"ok": True, "username": body.username, "role": info["role"], "token": _token(body.username)}
+
+
+@app.get("/api/audit")
+def audit(limit: int = 300, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    """The activity log — who did what, when. Admin only."""
+    rows = (db.query(models.AuditLog)
+            .order_by(models.AuditLog.created_at.desc()).limit(min(limit, 1000)).all())
+    return [{"time": (r.created_at.isoformat() if r.created_at else None),
+             "user": r.username, "method": r.method, "path": r.path, "status": r.status}
+            for r in rows]
 
 
 # ---------- contract result helper ----------

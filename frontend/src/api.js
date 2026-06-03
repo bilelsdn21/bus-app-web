@@ -56,4 +56,6 @@ export const api = {
   deleteDest: (id) => req(`/api/destinations/${id}`, { method: "DELETE" }),
 
   setConfig: (p) => req(`/api/config`, { method: "PUT", body: JSON.stringify(p) }),
+
+  audit: () => req(`/api/audit`),
 };
