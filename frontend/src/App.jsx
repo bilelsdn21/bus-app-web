@@ -10,6 +10,8 @@ export default function App() {
   const [auth, setAuth] = useState(() => {
     try { return JSON.parse(localStorage.getItem("bus_auth") || "null"); } catch { return null; }
   });
+  const isAdmin = auth?.role === "admin";
+
   const [mode, setMode] = useState(
     typeof window !== "undefined" && window.innerWidth < 768 ? "entry" : "calendar"
   );
@@ -20,6 +22,14 @@ export default function App() {
   if (!auth) return <Login onLogin={setAuth} />;
 
   const logout = () => { localStorage.removeItem("bus_auth"); setAuth(null); };
+
+  // tabs allowed per role
+  const tabs = isAdmin
+    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"]]
+    : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"]];
+
+  // if a viewer somehow has an admin-only mode selected, fall back to calendar
+  const effMode = tabs.some(([k]) => k === mode) ? mode : "calendar";
 
   return (
     <div className="min-h-full bg-slate-100 text-slate-800">
@@ -33,23 +43,22 @@ export default function App() {
             </div>
           </div>
           <nav className="flex flex-wrap gap-1 rounded-xl bg-white/10 p-1">
-            <Tab on={mode === "calendar"} onClick={() => setMode("calendar")}>📊 Calendrier</Tab>
-            <Tab on={mode === "contracts"} onClick={() => setMode("contracts")}>📄 Contrats</Tab>
-            <Tab on={mode === "entry"} onClick={() => setMode("entry")}>✏️ Saisie</Tab>
-            <Tab on={mode === "settings"} onClick={() => setMode("settings")}>⚙️ Params</Tab>
+            {tabs.map(([key, label]) => (
+              <Tab key={key} on={effMode === key} onClick={() => setMode(key)}>{label}</Tab>
+            ))}
           </nav>
-          <button onClick={logout} title="Déconnexion" className="hidden rounded-lg px-2 py-1 text-xs text-sky-200 hover:bg-white/10 hover:text-white sm:block">
-            {auth.username} ⏻
+          <button onClick={logout} title="Déconnexion" className="hidden items-center gap-1 rounded-lg px-2 py-1 text-xs text-sky-200 hover:bg-white/10 hover:text-white sm:flex">
+            {auth.username}{!isAdmin && <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold uppercase">lecture</span>} ⏻
           </button>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
-        <ErrorBoundary key={mode}>
-          {mode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
-          {mode === "contracts" && <ContractsView />}
-          {mode === "entry" && <DayEntry />}
-          {mode === "settings" && <SettingsView />}
+        <ErrorBoundary key={effMode}>
+          {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
+          {effMode === "contracts" && <ContractsView readOnly={!isAdmin} />}
+          {effMode === "entry" && <DayEntry />}
+          {effMode === "settings" && <SettingsView />}
         </ErrorBoundary>
       </main>
     </div>

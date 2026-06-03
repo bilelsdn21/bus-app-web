@@ -1,10 +1,20 @@
 // Central API client. Base URL is overridable for production (Vercel env).
 const BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
+function authToken() {
+  try { return JSON.parse(localStorage.getItem("bus_auth") || "null")?.token || ""; }
+  catch { return ""; }
+}
+
 async function req(path, opts = {}) {
+  const token = authToken();
   const res = await fetch(BASE + path, {
-    headers: { "Content-Type": "application/json" },
     ...opts,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers || {}),
+    },
   });
   if (!res.ok) {
     let msg = `Erreur ${res.status}`;

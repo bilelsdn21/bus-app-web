@@ -5,7 +5,7 @@ Run:  uvicorn app.main:app --reload --port 8000
 import os
 import hashlib
 from datetime import date
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -13,15 +13,19 @@ from sqlalchemy.orm import Session
 from .database import Base, engine, get_db
 from . import models, schemas, calc
 
-# Simple credential store for the 2 users. Override in production with env:
-#   BUS_USERS="aymen:motdepasse1,bilel:motdepasse2"
+# Credential + role store. Each entry: "user:password:role" (role = admin | viewer).
+# If role is omitted it defaults to admin. Override in production with env:
+#   BUS_USERS="aymen:pass1:admin,bilel:pass2:admin,sami:pass3:admin,equipe:pass4:viewer"
 def _load_users():
-    raw = os.environ.get("BUS_USERS", "admin:btt2026,terrain:terrain2026")
+    raw = os.environ.get("BUS_USERS", "admin:btt2026:admin,terrain:terrain2026:viewer")
     users = {}
-    for pair in raw.split(","):
-        if ":" in pair:
-            u, p = pair.split(":", 1)
-            users[u.strip()] = p
+    for entry in raw.split(","):
+        parts = entry.split(":")
+        if len(parts) >= 2:
+            u = parts[0].strip()
+            p = parts[1]
+            role = parts[2].strip().lower() if len(parts) >= 3 and parts[2].strip() else "admin"
+            users[u] = {"password": p, "role": role}
     return users
 
 USERS = _load_users()
@@ -29,6 +33,22 @@ USERS = _load_users()
 def _token(username: str) -> str:
     secret = os.environ.get("BUS_SECRET", "bus-local-secret")
     return hashlib.sha256(f"{username}:{secret}".encode()).hexdigest()
+
+# token -> role, for verifying requests
+TOKENS = {_token(u): info["role"] for u, info in USERS.items()}
+
+def _role_of(authorization: str | None) -> str | None:
+    tok = authorization[7:] if authorization and authorization.lower().startswith("bearer ") else ""
+    return TOKENS.get(tok)
+
+def require_admin(authorization: str = Header(None)):
+    """Allow only admin tokens through. Used on every write endpoint."""
+    role = _role_of(authorization)
+    if role is None:
+        raise HTTPException(401, "Non authentifié — reconnectez-vous.")
+    if role != "admin":
+        raise HTTPException(403, "Action réservée aux administrateurs (compte en lecture seule).")
+    return role
 
 Base.metadata.create_all(engine)
 
@@ -77,10 +97,10 @@ class LoginBody(BaseModel):
 
 @app.post("/api/login")
 def login(body: LoginBody):
-    expected = USERS.get(body.username)
-    if not expected or expected != body.password:
+    info = USERS.get(body.username)
+    if not info or info["password"] != body.password:
         raise HTTPException(401, "Identifiants incorrects.")
-    return {"ok": True, "username": body.username, "token": _token(body.username)}
+    return {"ok": True, "username": body.username, "role": info["role"], "token": _token(body.username)}
 
 
 # ---------- contract result helper ----------
@@ -115,7 +135,7 @@ def list_buses(db: Session = Depends(get_db)):
 
 
 @app.post("/api/buses", response_model=schemas.BusOut)
-def create_bus(body: schemas.BusCreate, db: Session = Depends(get_db)):
+def create_bus(body: schemas.BusCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     if db.query(models.Bus).filter(models.Bus.name == body.name).first():
         raise HTTPException(409, "Un véhicule avec ce nom existe déjà.")
     bus = models.Bus(**body.model_dump())
@@ -124,7 +144,7 @@ def create_bus(body: schemas.BusCreate, db: Session = Depends(get_db)):
 
 
 @app.put("/api/buses/{bus_id}", response_model=schemas.BusOut)
-def update_bus(bus_id: int, body: schemas.BusCreate, db: Session = Depends(get_db)):
+def update_bus(bus_id: int, body: schemas.BusCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     bus = db.get(models.Bus, bus_id)
     if not bus:
         raise HTTPException(404, "Véhicule introuvable.")
@@ -135,7 +155,7 @@ def update_bus(bus_id: int, body: schemas.BusCreate, db: Session = Depends(get_d
 
 
 @app.delete("/api/buses/{bus_id}", status_code=204)
-def delete_bus(bus_id: int, db: Session = Depends(get_db)):
+def delete_bus(bus_id: int, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     bus = db.get(models.Bus, bus_id)
     if not bus:
         return
@@ -150,14 +170,14 @@ def list_destinations(db: Session = Depends(get_db)):
 
 
 @app.post("/api/destinations", response_model=schemas.DestinationOut)
-def create_destination(body: schemas.DestinationCreate, db: Session = Depends(get_db)):
+def create_destination(body: schemas.DestinationCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     d = models.Destination(**body.model_dump())
     db.add(d); db.commit(); db.refresh(d)
     return d
 
 
 @app.put("/api/destinations/{did}", response_model=schemas.DestinationOut)
-def update_destination(did: int, body: schemas.DestinationCreate, db: Session = Depends(get_db)):
+def update_destination(did: int, body: schemas.DestinationCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     d = db.get(models.Destination, did)
     if not d:
         raise HTTPException(404, "Destination introuvable.")
@@ -168,7 +188,7 @@ def update_destination(did: int, body: schemas.DestinationCreate, db: Session = 
 
 
 @app.delete("/api/destinations/{did}", status_code=204)
-def delete_destination(did: int, db: Session = Depends(get_db)):
+def delete_destination(did: int, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     d = db.get(models.Destination, did)
     if d:
         db.delete(d); db.commit()
@@ -180,7 +200,7 @@ def read_config(db: Session = Depends(get_db)):
 
 
 @app.put("/api/config", response_model=schemas.ConfigOut)
-def update_config(body: schemas.ConfigUpdate, db: Session = Depends(get_db)):
+def update_config(body: schemas.ConfigUpdate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     cfg = get_config(db)
     cfg.cut_morn, cfg.cut_night = body.cut_morn, body.cut_night
     db.commit(); db.refresh(cfg)
@@ -198,7 +218,7 @@ def list_contracts(bus_id: int | None = None, db: Session = Depends(get_db)):
 
 
 @app.post("/api/contracts")
-def create_contract(body: schemas.ContractCreate, db: Session = Depends(get_db)):
+def create_contract(body: schemas.ContractCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     if body.end_date < body.start_date:
         raise HTTPException(400, "La date de fin doit être après la date de début.")
     if not db.get(models.Bus, body.bus_id):
@@ -209,7 +229,7 @@ def create_contract(body: schemas.ContractCreate, db: Session = Depends(get_db))
 
 
 @app.put("/api/contracts/{cid}")
-def update_contract(cid: int, body: schemas.ContractCreate, db: Session = Depends(get_db)):
+def update_contract(cid: int, body: schemas.ContractCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     c = db.get(models.Contract, cid)
     if not c:
         raise HTTPException(404, "Contrat introuvable.")
@@ -222,7 +242,7 @@ def update_contract(cid: int, body: schemas.ContractCreate, db: Session = Depend
 
 
 @app.delete("/api/contracts/{cid}", status_code=204)
-def delete_contract(cid: int, db: Session = Depends(get_db)):
+def delete_contract(cid: int, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     c = db.get(models.Contract, cid)
     if c:
         db.delete(c); db.commit()
@@ -246,7 +266,7 @@ def list_fuel(bus_id: int | None = None, db: Session = Depends(get_db)):
 
 
 @app.put("/api/fuel", response_model=schemas.FuelOut)
-def upsert_fuel(body: schemas.FuelUpsert, db: Session = Depends(get_db)):
+def upsert_fuel(body: schemas.FuelUpsert, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     """Set estimated and/or actual for a bus + calendar month (creates if missing)."""
     fm = (db.query(models.FuelMonth)
           .filter(models.FuelMonth.bus_id == body.bus_id,
@@ -376,7 +396,7 @@ def get_day(bus_id: int, day_iso: str, db: Session = Depends(get_db)):
 
 # ---------- save a day (mobile entry submit) ----------
 @app.post("/api/day")
-def save_day(body: schemas.DaySave, db: Session = Depends(get_db)):
+def save_day(body: schemas.DaySave, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     bus = db.get(models.Bus, body.bus_id)
     if not bus:
         raise HTTPException(404, "Véhicule introuvable.")

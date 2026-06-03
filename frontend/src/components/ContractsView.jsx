@@ -4,7 +4,7 @@ import { fmtTND } from "../colors.js";
 
 const MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jui", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 
-export default function ContractsView() {
+export default function ContractsView({ readOnly = false }) {
   const [buses, setBuses] = useState([]);
   const [busId, setBusId] = useState("");
   const [contracts, setContracts] = useState([]);
@@ -55,10 +55,12 @@ export default function ContractsView() {
           className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm">
           {buses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        <button onClick={() => setForm({ start_date: "", end_date: "", loyer: bus?.loyer || 0, label: "" })}
-          className="rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-white shadow hover:bg-[#234d77]">
-          + Nouveau contrat
-        </button>
+        {!readOnly && (
+          <button onClick={() => setForm({ start_date: "", end_date: "", loyer: bus?.loyer || 0, label: "" })}
+            className="rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-white shadow hover:bg-[#234d77]">
+            + Nouveau contrat
+          </button>
+        )}
       </div>
 
       {err && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{err}</div>}
@@ -74,8 +76,8 @@ export default function ContractsView() {
               </div>
               <div className="flex gap-2">
                 {c.is_estimated && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Estimé</span>}
-                <button onClick={() => setForm({ id: c.contract_id, start_date: c.start_date, end_date: c.end_date, loyer: c.loyer, label: c.label })} className="text-slate-400 hover:text-sky-600" title="Modifier">✎</button>
-                <button onClick={() => removeContract(c.contract_id)} className="text-slate-400 hover:text-rose-600" title="Supprimer">🗑</button>
+                {!readOnly && <button onClick={() => setForm({ id: c.contract_id, start_date: c.start_date, end_date: c.end_date, loyer: c.loyer, label: c.label })} className="text-slate-400 hover:text-sky-600" title="Modifier">✎</button>}
+                {!readOnly && <button onClick={() => removeContract(c.contract_id)} className="text-slate-400 hover:text-rose-600" title="Supprimer">🗑</button>}
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
@@ -111,8 +113,17 @@ export default function ContractsView() {
               {fuel.map((f) => (
                 <tr key={`${f.year}-${f.month}`} className="border-t border-slate-100">
                   <td className="py-2 font-semibold">{MONTHS[f.month - 1]} {f.year}</td>
-                  <td><FuelCell value={f.estimated} onSave={(v) => saveFuel(f.year, f.month, "estimated", v)} /></td>
-                  <td><FuelCell value={f.actual} placeholder="—" onSave={(v) => saveFuel(f.year, f.month, "actual", v)} /></td>
+                  {readOnly ? (
+                    <>
+                      <td className="py-2">{f.estimated ? f.estimated.toLocaleString("fr-FR") : "—"}</td>
+                      <td className="py-2">{f.actual != null ? f.actual.toLocaleString("fr-FR") : "—"}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td><FuelCell value={f.estimated} onSave={(v) => saveFuel(f.year, f.month, "estimated", v)} /></td>
+                      <td><FuelCell value={f.actual} placeholder="—" onSave={(v) => saveFuel(f.year, f.month, "actual", v)} /></td>
+                    </>
+                  )}
                 </tr>
               ))}
               {fuel.length === 0 && <tr><td colSpan={3} className="py-3 text-slate-400">Aucun mois. Les mois apparaissent dès qu'il y a des données ou un contrat.</td></tr>}
