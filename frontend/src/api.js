@@ -31,6 +31,7 @@ export const api = {
   destinations: () => req(`/api/destinations`),
   config: () => req(`/api/config`),
   getDay: (busId, iso) => req(`/api/day/${busId}/${iso}`),
+  coverage: (busId, iso) => req(`/api/coverage/${busId}/${iso}`),
   saveDay: (payload) => req(`/api/day`, { method: "POST", body: JSON.stringify(payload) }),
 
   contracts: (busId) => req(`/api/contracts?bus_id=${busId}`),

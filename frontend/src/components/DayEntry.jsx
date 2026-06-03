@@ -22,12 +22,23 @@ export default function DayEntry() {
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState(null); // {type, msg}
   const [loading, setLoading] = useState(false);
+  const [cover, setCover] = useState(null); // {covered, contract}
 
   useEffect(() => {
     Promise.all([api.buses(), api.destinations()])
       .then(([b, d]) => { setBuses(b); setDests(d); if (b[0]) setBusId(String(b[0].id)); })
       .catch((e) => setStatus({ type: "error", msg: e.message }));
   }, []);
+
+  // check contract coverage whenever bus/date change
+  useEffect(() => {
+    if (!busId || !date) { setCover(null); return; }
+    let alive = true;
+    api.coverage(busId, date)
+      .then((c) => { if (alive) setCover(c); })
+      .catch(() => { if (alive) setCover(null); });
+    return () => { alive = false; };
+  }, [busId, date]);
 
   // categories from destinations + the unavailability reasons
   const categories = useMemo(() => {
@@ -94,6 +105,17 @@ export default function DayEntry() {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
         </Field>
         {bus && <div className="text-xs text-slate-400">Type : <b>{bus.type}</b> · Région : <b>{bus.region}</b></div>}
+        {cover && cover.covered && cover.contract && (
+          <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            ✅ Contrat actif : {cover.contract.label || "contrat"} ({cover.contract.start_date} → {cover.contract.end_date})
+          </div>
+        )}
+        {cover && !cover.covered && (
+          <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+            ⛔ Aucun contrat ne couvre cette date pour ce véhicule.<br />
+            Créez d'abord un contrat (onglet <b>Contrats</b>) — la saisie est bloquée tant qu'il n'y en a pas.
+          </div>
+        )}
       </div>
 
       {/* activity rows */}
@@ -142,9 +164,9 @@ export default function DayEntry() {
         </div>
       )}
 
-      <button onClick={save} disabled={loading || !busId}
+      <button onClick={save} disabled={loading || !busId || (cover && !cover.covered)}
         className="sticky bottom-3 w-full rounded-2xl bg-[#1a3a5c] py-3.5 text-base font-bold text-white shadow-xl transition hover:bg-[#234d77] disabled:opacity-50">
-        {loading ? "Enregistrement…" : "💾 Enregistrer"}
+        {loading ? "Enregistrement…" : (cover && !cover.covered) ? "🔒 Contrat requis" : "💾 Enregistrer"}
       </button>
     </div>
   );
