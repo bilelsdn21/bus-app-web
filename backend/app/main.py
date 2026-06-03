@@ -309,7 +309,7 @@ def calendar(year: int, month: int, db: Session = Depends(get_db)):
     for b in books:
         s = max(b.date, start)
         e = min(b.end_date or b.date, end)
-        cell = {"id": b.id, "type": b.type, "heure_debut": b.heure_debut,
+        cell = {"id": b.id, "type": b.type, "heure_debut": b.heure_debut, "heure_fin": b.heure_fin,
                 "multi": (b.end_date is not None and b.end_date != b.date)}
         for off in range((e - s).days + 1):
             d = s + timedelta(days=off)

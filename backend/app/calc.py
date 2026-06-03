@@ -19,19 +19,48 @@ MONTH_FR = {
 MORNING, EVENING, NIGHT, UNKNOWN = 1, 2, 3, 0
 
 
-def get_period(heure: str, cut_morn: int, cut_night: int) -> int:
-    """Return MORNING/EVENING/NIGHT from a 'HH:MM' start time, UNKNOWN if blank/bad."""
+def _hour(heure: str):
     if not heure or ":" not in heure:
-        return UNKNOWN
+        return None
     try:
-        h = int(heure.split(":")[0])
+        return int(heure.split(":")[0])
     except (ValueError, IndexError):
+        return None
+
+
+def get_period(heure: str, cut_morn: int, cut_night: int) -> int:
+    """Return MORNING/EVENING/NIGHT from a 'HH:MM' time, UNKNOWN if blank/bad."""
+    h = _hour(heure)
+    if h is None:
         return UNKNOWN
     if h < cut_morn:
         return MORNING
     if h < cut_night:
         return EVENING
     return NIGHT
+
+
+def periods_covered(hd: str, hf: str, cut_morn: int, cut_night: int) -> set:
+    """
+    The set of periods a single excursion touches, from its start time to end time.
+    A 06:00 -> 17:00 trip covers {morning, evening}; 08:00 -> 11:00 covers {morning}.
+    End time is treated as exclusive (returning AT 13:00 = morning only).
+    """
+    h1 = _hour(hd)
+    if h1 is None:
+        return set()
+    h2 = _hour(hf)
+    if h2 is None or h2 <= h1:
+        p = get_period(hd, cut_morn, cut_night)
+        return {p} - {UNKNOWN}
+    cov = set()
+    if h1 < cut_morn:
+        cov.add(MORNING)
+    if h2 > cut_morn and h1 < cut_night:
+        cov.add(EVENING)
+    if h2 > cut_night:
+        cov.add(NIGHT)
+    return cov
 
 
 def day_color(day_bookings, cut_morn=13, cut_night=22) -> str:
@@ -51,10 +80,12 @@ def day_color(day_bookings, cut_morn=13, cut_night=22) -> str:
     # a multi-day excursion reserves the whole span -> green
     if any(b.get("multi") for b in books):
         return "green"
-    # two+ excursions in different periods -> green
-    periods = {get_period(b.get("heure_debut", ""), cut_morn, cut_night) for b in books}
+    # union of every period touched by every excursion (start->end of each)
+    periods = set()
+    for b in books:
+        periods |= periods_covered(b.get("heure_debut", ""), b.get("heure_fin", ""), cut_morn, cut_night)
     periods.discard(UNKNOWN)
-    if len(periods) > 1:
+    if len(periods) > 1:        # spans 2+ periods (one long trip OR several) -> green
         return "green"
     p = next(iter(periods)) if periods else UNKNOWN
     return {MORNING: "yellow", EVENING: "orange", NIGHT: "purple"}.get(p, "green")
