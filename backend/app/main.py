@@ -4,10 +4,11 @@ Run:  uvicorn app.main:app --reload --port 8000
 """
 import os
 import hashlib
-from datetime import date
+from datetime import date, timedelta
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
@@ -291,20 +292,28 @@ def calendar(year: int, month: int, db: Session = Depends(get_db)):
     cfg = get_config(db)
     start, end = calc.month_bounds(year, month)
     buses = db.query(models.Bus).order_by(models.Bus.sort_order).all()
+
+    # bookings whose [date .. end_date] span OVERLAPS this month (covers multi-day)
     books = (db.query(models.Booking)
-             .filter(models.Booking.date >= start, models.Booking.date <= end).all())
+             .filter(models.Booking.date <= end,
+                     func.coalesce(models.Booking.end_date, models.Booking.date) >= start)
+             .all())
 
+    # for the simple-net fallback we only count excursions STARTING in the month
     book_dicts = [{
-        "id": b.id, "bus_id": b.bus_id, "date": b.date.isoformat(), "type": b.type,
-        "destination": b.destination, "client": b.client, "pax": b.pax,
-        "unit_price": b.unit_price, "total": b.total, "notes": b.notes,
-        "heure_debut": b.heure_debut, "heure_fin": b.heure_fin,
-    } for b in books]
+        "id": b.id, "bus_id": b.bus_id, "date": b.date, "type": b.type, "total": b.total,
+    } for b in books if start <= b.date <= end]
 
-    # group bookings per (bus_id, day)
+    # mark each excursion active on every day of its span that falls in this month
     by_cell = {}
-    for b in book_dicts:
-        by_cell.setdefault((b["bus_id"], b["date"]), []).append(b)
+    for b in books:
+        s = max(b.date, start)
+        e = min(b.end_date or b.date, end)
+        cell = {"id": b.id, "type": b.type, "heure_debut": b.heure_debut,
+                "multi": (b.end_date is not None and b.end_date != b.date)}
+        for off in range((e - s).days + 1):
+            d = s + timedelta(days=off)
+            by_cell.setdefault((b.bus_id, d.isoformat()), []).append(cell)
 
     # contracts grouped by bus, to pick the one overlapping the viewed month
     contracts = db.query(models.Contract).all()
@@ -395,6 +404,101 @@ def get_day(bus_id: int, day_iso: str, db: Session = Depends(get_db)):
 
 
 # ---------- save a day (mobile entry submit) ----------
+UNAVAIL_CATS = {"Entretien", "Libre", "Repos Chauffeur"}
+
+def _excursion_out(b: models.Booking) -> dict:
+    return {
+        "id": b.id, "bus_id": b.bus_id,
+        "start_date": b.date.isoformat(),
+        "end_date": (b.end_date or b.date).isoformat(),
+        "type": b.type, "destination": b.destination, "client": b.client,
+        "pax": b.pax, "unit_price": b.unit_price, "total": b.total,
+        "heure_debut": b.heure_debut, "heure_fin": b.heure_fin, "notes": b.notes,
+        "multi_day": (b.end_date is not None and b.end_date != b.date),
+    }
+
+def _require_contract(db: Session, bus_id: int, d: date):
+    cov = (db.query(models.Contract)
+           .filter(models.Contract.bus_id == bus_id,
+                   models.Contract.start_date <= d,
+                   models.Contract.end_date >= d).first())
+    if not cov:
+        raise HTTPException(409,
+            "Aucun contrat ne couvre cette date pour ce véhicule. "
+            "Créez d'abord un contrat (onglet Contrats) couvrant cette période.")
+
+def _apply_excursion(db: Session, b: models.Booking, body: schemas.ExcursionIn):
+    bus = db.get(models.Bus, body.bus_id)
+    if not bus:
+        raise HTTPException(404, "Véhicule introuvable.")
+    start = body.start_date
+    end = body.end_date or start
+    if end < start:
+        raise HTTPException(400, "La date de fin doit être ≥ la date de début.")
+    cat = (body.category or "").strip()
+    dest = (body.destination or "").strip()
+    is_unavail = cat in UNAVAIL_CATS
+    if not is_unavail and not dest:
+        raise HTTPException(400, "Choisissez une destination.")
+    _require_contract(db, bus.id, start)   # coverage on the start day
+    b.bus_id = bus.id
+    b.date = start
+    b.end_date = end
+    b.client = body.client
+    b.pax = body.pax
+    b.heure_debut = body.heure_debut
+    b.heure_fin = body.heure_fin
+    b.notes = body.notes
+    if is_unavail:
+        b.type = "Unavailable"; b.destination = cat
+        b.unit_price = 0; b.total = 0
+    else:
+        price = price_for(db, dest, bus.type)
+        b.type = "Booking"; b.destination = dest
+        b.unit_price = price
+        b.total = body.total if body.total is not None else price
+
+
+@app.get("/api/excursions/day/{bus_id}/{day_iso}")
+def excursions_for_day(bus_id: int, day_iso: str, db: Session = Depends(get_db)):
+    """All excursions ACTIVE on this day for the bus (covers multi-day spans)."""
+    try:
+        d = date.fromisoformat(day_iso)
+    except ValueError:
+        raise HTTPException(400, "Date invalide.")
+    rows = (db.query(models.Booking)
+            .filter(models.Booking.bus_id == bus_id,
+                    models.Booking.date <= d,
+                    func.coalesce(models.Booking.end_date, models.Booking.date) >= d)
+            .order_by(models.Booking.heure_debut).all())
+    return [_excursion_out(r) for r in rows]
+
+
+@app.post("/api/excursions")
+def create_excursion(body: schemas.ExcursionIn, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    b = models.Booking()
+    _apply_excursion(db, b, body)
+    db.add(b); db.commit(); db.refresh(b)
+    return _excursion_out(b)
+
+
+@app.put("/api/excursions/{exc_id}")
+def update_excursion(exc_id: int, body: schemas.ExcursionIn, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    b = db.get(models.Booking, exc_id)
+    if not b:
+        raise HTTPException(404, "Excursion introuvable.")
+    _apply_excursion(db, b, body)
+    db.commit(); db.refresh(b)
+    return _excursion_out(b)
+
+
+@app.delete("/api/excursions/{exc_id}", status_code=204)
+def delete_excursion(exc_id: int, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    b = db.get(models.Booking, exc_id)
+    if b:
+        db.delete(b); db.commit()
+
+
 @app.get("/api/coverage/{bus_id}/{day_iso}")
 def coverage(bus_id: int, day_iso: str, db: Session = Depends(get_db)):
     """Does this bus have a contract covering this date? Used by the entry form."""

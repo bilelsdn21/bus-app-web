@@ -1,35 +1,35 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { DOT, fmtTND } from "../colors.js";
+import ExcursionEditor from "./ExcursionEditor.jsx";
 
-export default function CalendarView({ year, month, setYear, setMonth }) {
+export default function CalendarView({ year, month, setYear, setMonth, readOnly = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [detail, setDetail] = useState(null); // {bus, day, iso, rows, loading}
+  const [dests, setDests] = useState([]);
+  const [editor, setEditor] = useState(null); // {bus, iso}
+
+  const reload = () => {
+    setError("");
+    return api.calendar(year, month).then(setData).catch((e) => setError(e.message));
+  };
 
   useEffect(() => {
     let alive = true;
-    setLoading(true); setError("");
-    api.calendar(year, month)
-      .then((d) => alive && setData(d))
-      .catch((e) => alive && setError(e.message))
-      .finally(() => alive && setLoading(false));
+    setLoading(true);
+    reload().finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [year, month]);
+
+  useEffect(() => { api.destinations().then(setDests).catch(() => {}); }, []);
 
   const prev = () => { if (month === 1) { setMonth(12); setYear(year - 1); } else setMonth(month - 1); };
   const next = () => { if (month === 12) { setMonth(1); setYear(year + 1); } else setMonth(month + 1); };
 
-  const openDay = async (bus, day) => {
+  const openDay = (bus, day) => {
     const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    setDetail({ bus, day, iso, rows: null, loading: true });
-    try {
-      const rows = await api.getDay(bus.id, iso);
-      setDetail({ bus, day, iso, rows, loading: false });
-    } catch (e) {
-      setDetail({ bus, day, iso, rows: [], loading: false, error: e.message });
-    }
+    setEditor({ bus, iso });
   };
 
   let region = null;
@@ -48,7 +48,7 @@ export default function CalendarView({ year, month, setYear, setMonth }) {
             <span className={`inline-block h-3 w-3 rounded-full ${v.bg}`} /> {v.label}
           </span>
         ))}
-        <span className="text-slate-400">· cliquez un point pour voir les excursions du jour</span>
+        <span className="text-slate-400">· cliquez une case jour pour {readOnly ? "voir" : "ajouter / modifier"} les excursions</span>
       </div>
 
       {error && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
@@ -124,7 +124,13 @@ export default function CalendarView({ year, month, setYear, setMonth }) {
         </>
       )}
 
-      {detail && <DayDetail d={detail} onClose={() => setDetail(null)} />}
+      {editor && (
+        <ExcursionEditor
+          bus={editor.bus} dayISO={editor.iso} dests={dests} readOnly={readOnly}
+          onClose={() => setEditor(null)}
+          onChanged={reload}
+        />
+      )}
     </div>
   );
 }

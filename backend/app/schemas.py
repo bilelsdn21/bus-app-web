@@ -40,6 +40,7 @@ class DestinationOut(DestinationBase):
 # ---- Booking ----
 class BookingBase(BaseModel):
     date: date
+    end_date: Optional[date] = None
     bus_id: int
     type: str = "Booking"
     destination: str = ""
@@ -57,6 +58,21 @@ class BookingCreate(BookingBase):
 class BookingOut(BookingBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
+
+
+# ---- Excursion (multi-day, create/edit one at a time) ----
+class ExcursionIn(BaseModel):
+    bus_id: int
+    start_date: date
+    end_date: Optional[date] = None   # defaults to start_date if omitted
+    category: str = ""                # used to detect Unavailable + look up price
+    destination: str = ""
+    client: str = ""
+    pax: int = 0
+    heure_debut: str = ""
+    heure_fin: str = ""
+    notes: str = ""
+    total: Optional[float] = None     # if provided, overrides the looked-up price
 
 
 # ---- Contract ----

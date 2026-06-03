@@ -34,6 +34,11 @@ export const api = {
   coverage: (busId, iso) => req(`/api/coverage/${busId}/${iso}`),
   saveDay: (payload) => req(`/api/day`, { method: "POST", body: JSON.stringify(payload) }),
 
+  excursionsForDay: (busId, iso) => req(`/api/excursions/day/${busId}/${iso}`),
+  createExcursion: (p) => req(`/api/excursions`, { method: "POST", body: JSON.stringify(p) }),
+  updateExcursion: (id, p) => req(`/api/excursions/${id}`, { method: "PUT", body: JSON.stringify(p) }),
+  deleteExcursion: (id) => req(`/api/excursions/${id}`, { method: "DELETE" }),
+
   contracts: (busId) => req(`/api/contracts?bus_id=${busId}`),
   createContract: (p) => req(`/api/contracts`, { method: "POST", body: JSON.stringify(p) }),
   updateContract: (id, p) => req(`/api/contracts/${id}`, { method: "PUT", body: JSON.stringify(p) }),

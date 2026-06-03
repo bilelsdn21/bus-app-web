@@ -36,7 +36,8 @@ class Destination(Base):
 class Booking(Base):
     __tablename__ = "bookings"
     id          = Column(Integer, primary_key=True)
-    date        = Column(Date, nullable=False, index=True)
+    date        = Column(Date, nullable=False, index=True)   # START day of the excursion
+    end_date    = Column(Date, nullable=True, index=True)    # END day (None/=date for single-day)
     bus_id      = Column(Integer, ForeignKey("buses.id"), nullable=False, index=True)
     type        = Column(String, default="Booking")           # Booking / Unavailable
     destination = Column(String, default="")
