@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import { fmtTND } from "../colors.js";
 
@@ -44,6 +44,21 @@ export default function ContractsView({ readOnly = false }) {
       reload();
     } catch (e) { setErr(e.message); }
   };
+
+  // Months to show in the fuel grid: last month → +6 ahead, plus any month that has data.
+  const fuelMonths = useMemo(() => {
+    const now = new Date();
+    const base = now.getFullYear() * 12 + now.getMonth(); // linear index of current month
+    let lo = base - 1, hi = base + 6;
+    fuel.forEach((f) => { const n = f.year * 12 + (f.month - 1); if (n < lo) lo = n; if (n > hi) hi = n; });
+    const out = [];
+    for (let n = lo; n <= hi; n++) {
+      const y = Math.floor(n / 12), m = (n % 12) + 1;
+      const f = fuel.find((x) => x.year === y && x.month === m);
+      out.push({ year: y, month: m, estimated: f ? f.estimated : "", actual: f ? f.actual : null });
+    }
+    return out;
+  }, [fuel]);
 
   const bus = buses.find((b) => String(b.id) === String(busId));
 
@@ -103,30 +118,33 @@ export default function ContractsView({ readOnly = false }) {
       {/* fuel per month */}
       <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200">
         <h2 className="mb-3 font-bold text-[#1a3a5c]">⛽ Carburant mensuel ({bus?.name})</h2>
-        <p className="mb-3 text-xs text-slate-400">Saisissez l'estimation à l'avance, puis le réel le 1er du mois suivant.</p>
+        <p className="mb-3 text-xs text-slate-400">Saisissez l'<b>estimation</b> à l'avance pour les mois à venir, puis le <b>réel</b> le 1er du mois suivant. Tapez un montant et cliquez ailleurs pour enregistrer.</p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-slate-400">
               <th className="py-1">Mois</th><th>Estimé (TND)</th><th>Réel (TND)</th>
             </tr></thead>
             <tbody>
-              {fuel.map((f) => (
-                <tr key={`${f.year}-${f.month}`} className="border-t border-slate-100">
-                  <td className="py-2 font-semibold">{MONTHS[f.month - 1]} {f.year}</td>
-                  {readOnly ? (
-                    <>
-                      <td className="py-2">{f.estimated ? f.estimated.toLocaleString("fr-FR") : "—"}</td>
-                      <td className="py-2">{f.actual != null ? f.actual.toLocaleString("fr-FR") : "—"}</td>
-                    </>
-                  ) : (
-                    <>
-                      <td><FuelCell value={f.estimated} onSave={(v) => saveFuel(f.year, f.month, "estimated", v)} /></td>
-                      <td><FuelCell value={f.actual} placeholder="—" onSave={(v) => saveFuel(f.year, f.month, "actual", v)} /></td>
-                    </>
-                  )}
-                </tr>
-              ))}
-              {fuel.length === 0 && <tr><td colSpan={3} className="py-3 text-slate-400">Aucun mois. Les mois apparaissent dès qu'il y a des données ou un contrat.</td></tr>}
+              {fuelMonths.map((f) => {
+                const now = new Date();
+                const isCurrent = f.year === now.getFullYear() && f.month === now.getMonth() + 1;
+                return (
+                  <tr key={`${f.year}-${f.month}`} className={`border-t border-slate-100 ${isCurrent ? "bg-sky-50/50" : ""}`}>
+                    <td className="py-2 font-semibold">{MONTHS[f.month - 1]} {f.year}{isCurrent && <span className="ml-1 text-[10px] font-bold uppercase text-sky-500">en cours</span>}</td>
+                    {readOnly ? (
+                      <>
+                        <td className="py-2">{f.estimated ? Number(f.estimated).toLocaleString("fr-FR") : "—"}</td>
+                        <td className="py-2">{f.actual != null ? Number(f.actual).toLocaleString("fr-FR") : "—"}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td><FuelCell value={f.estimated} placeholder="0" onSave={(v) => saveFuel(f.year, f.month, "estimated", v)} /></td>
+                        <td><FuelCell value={f.actual} placeholder="—" onSave={(v) => saveFuel(f.year, f.month, "actual", v)} /></td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
