@@ -15,10 +15,11 @@ from .database import Base, engine, get_db, SessionLocal
 from . import models, schemas, calc
 
 # Credential + role store. Each entry: "user:password:role" (role = admin | viewer).
-# If role is omitted it defaults to admin. Override in production with env:
+# REAL accounts live ONLY in the BUS_USERS env var on the server — never in this code.
+# The default below is a throwaway used only for local development.
 #   BUS_USERS="aymen:pass1:admin,bilel:pass2:admin,sami:pass3:admin,equipe:pass4:viewer"
 def _load_users():
-    raw = os.environ.get("BUS_USERS", "admin:btt2026:admin,terrain:terrain2026:viewer")
+    raw = os.environ.get("BUS_USERS", "dev:dev:admin")
     users = {}
     for entry in raw.split(","):
         parts = entry.split(":")
