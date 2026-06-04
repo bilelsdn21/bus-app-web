@@ -8,7 +8,20 @@ The current Excel/Streamlit workflow is untouched — this lives entirely in `bu
 ## Why this fixes the old pain
 - No VBA → no compile errors, no macro security, no Mark-of-the-Web.
 - Bookings reference a bus by **ID (foreign key)** → the name-mismatch bug that lost 1,440 TND **cannot happen**.
-- One calc module (`backend/app/calc.py`) = single source of truth for net, %, colors, summary.
+- One calc module (`backend/app/services/calc.py`) = single source of truth for net, %, colors, summary.
+
+## Backend architecture (MVC)
+The FastAPI backend (`backend/app/`) is organized as Model–View–Controller:
+
+| Layer | Location | Responsibility |
+|---|---|---|
+| **Model** | `models.py` | SQLAlchemy ORM tables (the data). |
+| **View** | `schemas.py` | Pydantic request/response schemas (serialization). |
+| **Controller** | `controllers/` | One `APIRouter` per resource (buses, contracts, excursions, fuel, calendar, days, destinations, config, system). HTTP only — thin. |
+| **Services** | `services/` | Domain logic the controllers call: `calc.py` (pure math), `calendar.py` (grid builder), `contracts.py` (result), `excursions.py` (validation/pricing), `lookups.py`, `audit.py`. |
+| **Core** | `core/` | Infrastructure: `database.py` (engine/session), `security.py` (auth/tokens/roles), `config.py` (CORS, constants). |
+
+`main.py` is a thin app factory: it creates the `FastAPI` app, sets CORS, and includes the routers. Start command is unchanged: `uvicorn app.main:app`.
 
 ## Run locally
 

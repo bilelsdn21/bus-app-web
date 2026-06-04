@@ -7,7 +7,7 @@ from sqlalchemy import (
     Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
-from .database import Base
+from .core.database import Base
 
 
 class Bus(Base):

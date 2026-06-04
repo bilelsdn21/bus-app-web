@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from datetime import datetime, date
 
-from .database import Base, engine, SessionLocal
+from .core.database import Base, engine, SessionLocal
 from . import models
 
 # data/ lives in the original project root: BUS PROJECT/data
