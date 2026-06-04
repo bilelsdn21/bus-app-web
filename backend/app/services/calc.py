@@ -65,13 +65,11 @@ def periods_covered(hd: str, hf: str, cut_morn: int, cut_night: int) -> set:
 
 def day_color(day_bookings, cut_morn=13, cut_night=22) -> str:
     """
-    Day dot color. Returns one of: "" | red | green | yellow | orange | purple | blue
+    Day dot color. Returns one of: "" | red | green | yellow | orange | purple
       - red    : unavailable only
       - green  : RESERVED — a multi-day excursion covers this day, OR
                  two+ excursions fall in different time periods
       - yellow/orange/purple : a single time period (matin / soir / nuit)
-      - blue   : booked, but no time-of-day recorded (e.g. imported historical
-                 data with no Heure Début/Fin) — can't tell the period
     """
     books = [b for b in day_bookings if b.get("type") == "Booking"]
     unavail = [b for b in day_bookings if b.get("type") != "Booking"]
@@ -89,10 +87,8 @@ def day_color(day_bookings, cut_morn=13, cut_night=22) -> str:
     periods.discard(UNKNOWN)
     if len(periods) > 1:        # spans 2+ periods (one long trip OR several) -> green
         return "green"
-    if not periods:            # booked but no usable time -> neutral "booked" dot
-        return "blue"
-    p = next(iter(periods))
-    return {MORNING: "yellow", EVENING: "orange", NIGHT: "purple"}.get(p, "blue")
+    p = next(iter(periods)) if periods else UNKNOWN
+    return {MORNING: "yellow", EVENING: "orange", NIGHT: "purple"}.get(p, "green")
 
 
 def month_bounds(year: int, month: int):
