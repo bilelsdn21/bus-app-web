@@ -3,6 +3,9 @@ import { api } from "../api.js";
 import { DOT, fmtTND } from "../colors.js";
 import ExcursionEditor from "./ExcursionEditor.jsx";
 
+// French weekday abbreviations, indexed by JS getDay() (0=Sunday … 6=Saturday)
+const WEEKDAYS_FR = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
+
 export default function CalendarView({ year, month, setYear, setMonth, readOnly = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,9 +64,17 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
               <thead>
                 <tr className="bg-[#1a3a5c] text-white">
                   <th className="sticky left-0 z-10 bg-[#1a3a5c] px-3 py-2 text-left font-semibold min-w-[190px]">Véhicule</th>
-                  {Array.from({ length: data.days_in_month }, (_, i) => (
-                    <th key={i} className="w-7 px-0.5 py-2 text-center font-medium">{i + 1}</th>
-                  ))}
+                  {Array.from({ length: data.days_in_month }, (_, i) => {
+                    const day = i + 1;
+                    const dow = new Date(data.year, data.month - 1, day).getDay(); // 0=dim … 6=sam
+                    const weekend = dow === 0 || dow === 6;
+                    return (
+                      <th key={i} className={`w-7 px-0.5 py-1 text-center font-medium ${weekend ? "bg-white/10" : ""}`}>
+                        <div className={`text-[9px] font-semibold uppercase leading-none ${weekend ? "text-amber-300" : "text-sky-300"}`}>{WEEKDAYS_FR[dow]}</div>
+                        <div className="leading-tight">{day}</div>
+                      </th>
+                    );
+                  })}
                   <th className="px-3 py-2 text-right font-semibold min-w-[120px]">Net Mois</th>
                   <th className="px-3 py-2 text-center font-semibold min-w-[70px]">%</th>
                   <th className="px-3 py-2 text-right font-semibold min-w-[90px]">Distance</th>
