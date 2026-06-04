@@ -176,7 +176,7 @@ const SubTab = ({ on, onClick, children }) => (
 
 function Modal({ title, children, onClose, onSave, canSave }) {
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-[#1a3a5c]">{title}</h3>
         {children}

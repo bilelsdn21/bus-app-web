@@ -35,7 +35,7 @@ export default function App() {
 
   return (
     <div className="min-h-full bg-slate-100 text-slate-800">
-      <header className="sticky top-0 z-20 bg-[#1a3a5c] text-white shadow-lg">
+      <header className="sticky top-0 z-40 bg-[#1a3a5c] text-white shadow-lg">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">🚌</span>

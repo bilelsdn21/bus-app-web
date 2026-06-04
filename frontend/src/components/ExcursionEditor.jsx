@@ -12,6 +12,7 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
   const [err, setErr] = useState("");
   const [form, setForm] = useState(null); // excursion being added/edited
   const [cover, setCover] = useState(null);
+  const [saving, setSaving] = useState(false); // guard against double-submit
 
   const load = () => api.excursionsForDay(bus.id, dayISO).then(setRows).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, [bus.id, dayISO]);
@@ -39,6 +40,8 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
   });
 
   const save = async () => {
+    if (saving) return;                 // ignore double-clicks while the request is in flight
+    setSaving(true);
     setErr("");
     try {
       const payload = {
@@ -50,6 +53,7 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
       else await api.createExcursion(payload);
       setForm(null); await load(); onChanged?.();
     } catch (e) { setErr(e.message); }
+    finally { setSaving(false); }
   };
   const del = async (e) => {
     if (!confirm("Supprimer cette excursion ?")) return;
@@ -60,7 +64,7 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
   const blocked = form && cover && !cover.covered;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between rounded-t-2xl bg-[#1a3a5c] px-5 py-4 text-white">
           <div>
@@ -126,8 +130,8 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
               )}
               {blocked && <div className="rounded bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800">⛔ Aucun contrat ne couvre cette date — créez un contrat d'abord.</div>}
               <div className="flex justify-end gap-2 pt-1">
-                <button onClick={() => setForm(null)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-100">Annuler</button>
-                <button onClick={save} disabled={!form.category || blocked} className="rounded-lg bg-[#1a3a5c] px-3 py-1.5 text-sm font-bold text-white hover:bg-[#234d77] disabled:opacity-50">Enregistrer</button>
+                <button onClick={() => setForm(null)} disabled={saving} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-100 disabled:opacity-50">Annuler</button>
+                <button onClick={save} disabled={saving || !form.category || blocked} className="rounded-lg bg-[#1a3a5c] px-3 py-1.5 text-sm font-bold text-white hover:bg-[#234d77] disabled:opacity-50">{saving ? "Enregistrement…" : "Enregistrer"}</button>
               </div>
             </div>
           )}

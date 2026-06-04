@@ -151,7 +151,7 @@ export default function ContractsView({ readOnly = false }) {
       </div>
 
       {form && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={() => setForm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setForm(null)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-lg font-bold text-[#1a3a5c]">{form.id ? "Modifier" : "Nouveau"} contrat</h3>
             <div className="space-y-3">
