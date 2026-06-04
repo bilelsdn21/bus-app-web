@@ -24,10 +24,11 @@ export default function App() {
 
   const logout = () => { localStorage.removeItem("bus_auth"); setAuth(null); };
 
-  // tabs allowed per role
+  // tabs allowed per role. Viewer sees Calendrier + Contrats + Params (all read-only);
+  // Saisie (data entry) and Journal (audit log) stay admin-only.
   const tabs = isAdmin
     ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"], ["journal", "🧾 Journal"]]
-    : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"]];
+    : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["settings", "⚙️ Params"]];
 
   // if a viewer somehow has an admin-only mode selected, fall back to calendar
   const effMode = tabs.some(([k]) => k === mode) ? mode : "calendar";
@@ -59,7 +60,7 @@ export default function App() {
           {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} />}
           {effMode === "contracts" && <ContractsView readOnly={!isAdmin} />}
           {effMode === "entry" && <DayEntry />}
-          {effMode === "settings" && <SettingsView />}
+          {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
           {effMode === "journal" && <JournalView />}
         </ErrorBoundary>
       </main>

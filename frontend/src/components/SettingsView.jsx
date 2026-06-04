@@ -4,24 +4,27 @@ import { api } from "../api.js";
 const TYPES = ["MICRO", "OTOKAR", "BUS"];
 const REGIONS = ["Sousse", "Djerba"];
 
-export default function SettingsView() {
+export default function SettingsView({ readOnly = false }) {
   const [tab, setTab] = useState("buses");
   return (
     <div className="space-y-5">
-      <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">Paramètres</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">Paramètres</h1>
+        {readOnly && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold uppercase text-slate-500">lecture seule</span>}
+      </div>
       <div className="flex gap-1 rounded-xl bg-slate-200 p-1 w-fit">
         <SubTab on={tab === "buses"} onClick={() => setTab("buses")}>🚌 Véhicules</SubTab>
         <SubTab on={tab === "dests"} onClick={() => setTab("dests")}>📍 Destinations</SubTab>
         <SubTab on={tab === "config"} onClick={() => setTab("config")}>⚙️ Périodes</SubTab>
       </div>
-      {tab === "buses" && <BusesPanel />}
-      {tab === "dests" && <DestsPanel />}
-      {tab === "config" && <ConfigPanel />}
+      {tab === "buses" && <BusesPanel readOnly={readOnly} />}
+      {tab === "dests" && <DestsPanel readOnly={readOnly} />}
+      {tab === "config" && <ConfigPanel readOnly={readOnly} />}
     </div>
   );
 }
 
-function BusesPanel() {
+function BusesPanel({ readOnly = false }) {
   const [buses, setBuses] = useState([]);
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
@@ -42,12 +45,12 @@ function BusesPanel() {
   return (
     <div className="space-y-3">
       {err && <Err msg={err} />}
-      <button onClick={() => setForm({ name: "", type: "BUS", region: "Sousse", distance: 0, plate: "" })} className={btnPrimary}>+ Véhicule</button>
+      {!readOnly && <button onClick={() => setForm({ name: "", type: "BUS", region: "Sousse", distance: 0, plate: "" })} className={btnPrimary}>+ Véhicule</button>}
       <p className="text-xs text-slate-400">💡 Le loyer se définit par <b>contrat</b> (onglet Contrats), pas sur le véhicule.</p>
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
         <table className="w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
-            <th className="px-3 py-2">Nom</th><th>Type</th><th>Région</th><th className="text-right">Distance</th><th></th>
+            <th className="px-3 py-2">Nom</th><th>Type</th><th>Région</th><th className="text-right">Distance</th>{!readOnly && <th></th>}
           </tr></thead>
           <tbody>
             {buses.map((b) => (
@@ -55,10 +58,12 @@ function BusesPanel() {
                 <td className="px-3 py-2 font-semibold text-slate-700">{b.name}</td>
                 <td>{b.type}</td><td>{b.region}</td>
                 <td className="text-right">{b.distance ? Number(b.distance).toLocaleString("fr-FR") + " km" : "—"}</td>
-                <td className="whitespace-nowrap pr-3 text-right">
-                  <button onClick={() => setForm({ ...b })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
-                  <button onClick={() => del(b)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
-                </td>
+                {!readOnly && (
+                  <td className="whitespace-nowrap pr-3 text-right">
+                    <button onClick={() => setForm({ ...b })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
+                    <button onClick={() => del(b)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -78,7 +83,7 @@ function BusesPanel() {
   );
 }
 
-function DestsPanel() {
+function DestsPanel({ readOnly = false }) {
   const [dests, setDests] = useState([]);
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
@@ -98,11 +103,11 @@ function DestsPanel() {
   return (
     <div className="space-y-3">
       {err && <Err msg={err} />}
-      <button onClick={() => setForm({ category: "", name: "", price_micro: 0, price_otokar: 0, price_bus: 0 })} className={btnPrimary}>+ Destination</button>
+      {!readOnly && <button onClick={() => setForm({ category: "", name: "", price_micro: 0, price_otokar: 0, price_bus: 0 })} className={btnPrimary}>+ Destination</button>}
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
         <table className="w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
-            <th className="px-3 py-2">Catégorie</th><th>Destination</th><th className="text-right">MICRO</th><th className="text-right">OTOKAR</th><th className="text-right">BUS</th><th></th>
+            <th className="px-3 py-2">Catégorie</th><th>Destination</th><th className="text-right">MICRO</th><th className="text-right">OTOKAR</th><th className="text-right">BUS</th>{!readOnly && <th></th>}
           </tr></thead>
           <tbody>
             {dests.map((d) => (
@@ -110,10 +115,12 @@ function DestsPanel() {
                 <td className="px-3 py-2 text-slate-400">{d.category}</td>
                 <td className="font-semibold text-slate-700">{d.name}</td>
                 <td className="text-right">{d.price_micro || "—"}</td><td className="text-right">{d.price_otokar || "—"}</td><td className="text-right">{d.price_bus || "—"}</td>
-                <td className="whitespace-nowrap pr-3 text-right">
-                  <button onClick={() => setForm({ ...d })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
-                  <button onClick={() => del(d)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
-                </td>
+                {!readOnly && (
+                  <td className="whitespace-nowrap pr-3 text-right">
+                    <button onClick={() => setForm({ ...d })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
+                    <button onClick={() => del(d)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -136,7 +143,7 @@ function DestsPanel() {
   );
 }
 
-function ConfigPanel() {
+function ConfigPanel({ readOnly = false }) {
   const [cfg, setCfg] = useState(null);
   const [msg, setMsg] = useState("");
   useEffect(() => { api.config().then(setCfg); }, []);
@@ -150,10 +157,10 @@ function ConfigPanel() {
     <div className="max-w-md space-y-3 rounded-2xl bg-white p-5 shadow ring-1 ring-slate-200">
       <p className="text-sm text-slate-500">Bornes horaires pour la couleur des excursions (matin / soir / nuit).</p>
       <div className="grid grid-cols-2 gap-3">
-        <L label="Coupure Matin/Soir (h)"><input type="number" className={inp} value={cfg.cut_morn} onChange={(e) => setCfg({ ...cfg, cut_morn: e.target.value })} /></L>
-        <L label="Coupure Soir/Nuit (h)"><input type="number" className={inp} value={cfg.cut_night} onChange={(e) => setCfg({ ...cfg, cut_night: e.target.value })} /></L>
+        <L label="Coupure Matin/Soir (h)"><input type="number" disabled={readOnly} className={inp} value={cfg.cut_morn} onChange={(e) => setCfg({ ...cfg, cut_morn: e.target.value })} /></L>
+        <L label="Coupure Soir/Nuit (h)"><input type="number" disabled={readOnly} className={inp} value={cfg.cut_night} onChange={(e) => setCfg({ ...cfg, cut_night: e.target.value })} /></L>
       </div>
-      <button onClick={save} className={btnPrimary}>Enregistrer</button>
+      {!readOnly && <button onClick={save} className={btnPrimary}>Enregistrer</button>}
       {msg && <span className="ml-3 text-sm text-emerald-600">{msg}</span>}
     </div>
   );
