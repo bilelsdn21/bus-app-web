@@ -59,25 +59,25 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
 
       {data && !loading && (
         <>
-          <div className="overflow-x-auto rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
+          <div className="max-h-[75vh] overflow-auto rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
             <table className="w-full border-collapse text-xs">
               <thead>
-                <tr className="bg-[#1a3a5c] text-white">
-                  <th className="sticky left-0 z-10 bg-[#1a3a5c] px-3 py-2 text-left font-semibold min-w-[190px]">Véhicule</th>
+                <tr className="text-white">
+                  <th className="sticky left-0 top-0 z-30 bg-[#1a3a5c] px-3 py-2 text-left font-semibold min-w-[190px]">Véhicule</th>
                   {Array.from({ length: data.days_in_month }, (_, i) => {
                     const day = i + 1;
                     const dow = new Date(data.year, data.month - 1, day).getDay(); // 0=dim … 6=sam
                     const weekend = dow === 0 || dow === 6;
                     return (
-                      <th key={i} className={`w-7 px-0.5 py-1 text-center font-medium ${weekend ? "bg-white/10" : ""}`}>
+                      <th key={i} className={`sticky top-0 z-20 w-7 px-0.5 py-1 text-center font-medium ${weekend ? "bg-[#24507a]" : "bg-[#1a3a5c]"}`}>
                         <div className={`text-[9px] font-semibold uppercase leading-none ${weekend ? "text-amber-300" : "text-sky-300"}`}>{WEEKDAYS_FR[dow]}</div>
                         <div className="leading-tight">{day}</div>
                       </th>
                     );
                   })}
-                  <th className="px-3 py-2 text-right font-semibold min-w-[120px]">Net Mois</th>
-                  <th className="px-3 py-2 text-center font-semibold min-w-[70px]">%</th>
-                  <th className="px-3 py-2 text-right font-semibold min-w-[90px]">Distance</th>
+                  <th className="sticky top-0 z-20 bg-[#1a3a5c] px-3 py-2 text-right font-semibold min-w-[120px]">Net Mois</th>
+                  <th className="sticky top-0 z-20 bg-[#1a3a5c] px-3 py-2 text-center font-semibold min-w-[70px]">%</th>
+                  <th className="sticky top-0 z-20 bg-[#1a3a5c] px-3 py-2 text-right font-semibold min-w-[90px]">Distance</th>
                 </tr>
               </thead>
               <tbody>
