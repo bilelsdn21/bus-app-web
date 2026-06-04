@@ -46,14 +46,20 @@ def _bearer(authorization: str | None) -> str:
 def _role_of(authorization: str | None) -> str | None:
     return TOKENS.get(_bearer(authorization))
 
-def require_admin(authorization: str = Header(None)):
-    """Allow only admin tokens through. Used on every write endpoint."""
-    role = _role_of(authorization)
+def require_admin(authorization: str = Header(None)) -> str:
+    """Allow only admin tokens through, and return the acting username (for the Journal)."""
+    tok = _bearer(authorization)
+    role = TOKENS.get(tok)
     if role is None:
         raise HTTPException(401, "Non authentifié — reconnectez-vous.")
     if role != "admin":
         raise HTTPException(403, "Action réservée aux administrateurs (compte en lecture seule).")
-    return role
+    return TOKEN_USER.get(tok, "?")
+
+
+def log_action(db: Session, username: str, action: str, detail: str = ""):
+    """Add a Journal entry (committed with the endpoint's own commit)."""
+    db.add(models.AuditLog(username=username, method=action, path="", status=200, detail=detail))
 
 Base.metadata.create_all(engine)
 
@@ -73,29 +79,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.middleware("http")
-async def audit_middleware(request: Request, call_next):
-    """Record every successful write (POST/PUT/DELETE) with the acting username."""
-    response = await call_next(request)
-    try:
-        path = request.url.path
-        if (request.method in ("POST", "PUT", "DELETE")
-                and path.startswith("/api") and path != "/api/login"
-                and 200 <= response.status_code < 300):
-            user = TOKEN_USER.get(_bearer(request.headers.get("authorization", "")))
-            if user:
-                db = SessionLocal()
-                try:
-                    db.add(models.AuditLog(username=user, method=request.method,
-                                           path=path, status=response.status_code))
-                    db.commit()
-                finally:
-                    db.close()
-    except Exception:
-        pass  # never let logging break a request
-    return response
 
 
 def get_config(db: Session) -> models.Config:
@@ -132,12 +115,12 @@ def login(body: LoginBody):
 
 
 @app.get("/api/audit")
-def audit(limit: int = 300, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+def get_audit(limit: int = 300, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     """The activity log — who did what, when. Admin only."""
     rows = (db.query(models.AuditLog)
             .order_by(models.AuditLog.created_at.desc()).limit(min(limit, 1000)).all())
     return [{"time": (r.created_at.isoformat() if r.created_at else None),
-             "user": r.username, "method": r.method, "path": r.path, "status": r.status}
+             "user": r.username, "action": r.method, "detail": r.detail or ""}
             for r in rows]
 
 
@@ -177,7 +160,9 @@ def create_bus(body: schemas.BusCreate, db: Session = Depends(get_db), _admin: s
     if db.query(models.Bus).filter(models.Bus.name == body.name).first():
         raise HTTPException(409, "Un véhicule avec ce nom existe déjà.")
     bus = models.Bus(**body.model_dump())
-    db.add(bus); db.commit(); db.refresh(bus)
+    db.add(bus); db.flush()
+    log_action(db, _admin, "Véhicule", f"Ajout : {bus.name}")
+    db.commit(); db.refresh(bus)
     return bus
 
 
@@ -188,6 +173,7 @@ def update_bus(bus_id: int, body: schemas.BusCreate, db: Session = Depends(get_d
         raise HTTPException(404, "Véhicule introuvable.")
     for k, v in body.model_dump().items():
         setattr(bus, k, v)
+    log_action(db, _admin, "Véhicule", f"Modification : {bus.name}")
     db.commit(); db.refresh(bus)
     return bus
 
@@ -199,7 +185,10 @@ def delete_bus(bus_id: int, db: Session = Depends(get_db), _admin: str = Depends
         return
     if db.query(models.Booking).filter(models.Booking.bus_id == bus_id).count():
         raise HTTPException(409, "Ce véhicule a des activités enregistrées — suppression bloquée.")
-    db.delete(bus); db.commit()
+    name = bus.name
+    db.delete(bus)
+    log_action(db, _admin, "Véhicule", f"Suppression : {name}")
+    db.commit()
 
 
 @app.get("/api/destinations", response_model=list[schemas.DestinationOut])
@@ -210,7 +199,9 @@ def list_destinations(db: Session = Depends(get_db)):
 @app.post("/api/destinations", response_model=schemas.DestinationOut)
 def create_destination(body: schemas.DestinationCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     d = models.Destination(**body.model_dump())
-    db.add(d); db.commit(); db.refresh(d)
+    db.add(d); db.flush()
+    log_action(db, _admin, "Destination", f"Ajout : {d.name} (MICRO {d.price_micro:.0f}/OTOKAR {d.price_otokar:.0f}/BUS {d.price_bus:.0f})")
+    db.commit(); db.refresh(d)
     return d
 
 
@@ -221,6 +212,7 @@ def update_destination(did: int, body: schemas.DestinationCreate, db: Session = 
         raise HTTPException(404, "Destination introuvable.")
     for k, v in body.model_dump().items():
         setattr(d, k, v)
+    log_action(db, _admin, "Destination", f"Modification : {d.name} (MICRO {d.price_micro:.0f}/OTOKAR {d.price_otokar:.0f}/BUS {d.price_bus:.0f})")
     db.commit(); db.refresh(d)
     return d
 
@@ -229,7 +221,10 @@ def update_destination(did: int, body: schemas.DestinationCreate, db: Session = 
 def delete_destination(did: int, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     d = db.get(models.Destination, did)
     if d:
-        db.delete(d); db.commit()
+        name = d.name
+        db.delete(d)
+        log_action(db, _admin, "Destination", f"Suppression : {name}")
+        db.commit()
 
 
 @app.get("/api/config", response_model=schemas.ConfigOut)
@@ -241,6 +236,7 @@ def read_config(db: Session = Depends(get_db)):
 def update_config(body: schemas.ConfigUpdate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     cfg = get_config(db)
     cfg.cut_morn, cfg.cut_night = body.cut_morn, body.cut_night
+    log_action(db, _admin, "Périodes", f"matin < {body.cut_morn}h, nuit ≥ {body.cut_night}h")
     db.commit(); db.refresh(cfg)
     return cfg
 
@@ -262,7 +258,10 @@ def create_contract(body: schemas.ContractCreate, db: Session = Depends(get_db),
     if not db.get(models.Bus, body.bus_id):
         raise HTTPException(404, "Véhicule introuvable.")
     c = models.Contract(**body.model_dump())
-    db.add(c); db.commit(); db.refresh(c)
+    db.add(c); db.flush()
+    bus = db.get(models.Bus, c.bus_id)
+    log_action(db, _admin, "Contrat", f"Ajout : {bus.name if bus else c.bus_id}, {c.start_date}→{c.end_date}, loyer {c.loyer:.0f} TND")
+    db.commit(); db.refresh(c)
     return compute_contract_result(db, c)
 
 
@@ -273,8 +272,12 @@ def update_contract(cid: int, body: schemas.ContractCreate, db: Session = Depend
         raise HTTPException(404, "Contrat introuvable.")
     if body.end_date < body.start_date:
         raise HTTPException(400, "La date de fin doit être après la date de début.")
+    old_loyer = c.loyer
     for k, v in body.model_dump().items():
         setattr(c, k, v)
+    bus = db.get(models.Bus, c.bus_id)
+    loyer_part = f"loyer {old_loyer:.0f} → {c.loyer:.0f} TND" if abs((old_loyer or 0) - (c.loyer or 0)) > 0.5 else f"loyer {c.loyer:.0f} TND"
+    log_action(db, _admin, "Contrat", f"Modification : {bus.name if bus else c.bus_id}, {c.start_date}→{c.end_date}, {loyer_part}")
     db.commit(); db.refresh(c)
     return compute_contract_result(db, c)
 
@@ -283,6 +286,8 @@ def update_contract(cid: int, body: schemas.ContractCreate, db: Session = Depend
 def delete_contract(cid: int, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     c = db.get(models.Contract, cid)
     if c:
+        bus = db.get(models.Bus, c.bus_id)
+        log_action(db, _admin, "Contrat", f"Suppression : {bus.name if bus else c.bus_id}, {c.start_date}→{c.end_date}, loyer {c.loyer:.0f} TND")
         db.delete(c); db.commit()
 
 
@@ -313,10 +318,14 @@ def upsert_fuel(body: schemas.FuelUpsert, db: Session = Depends(get_db), _admin:
     if not fm:
         fm = models.FuelMonth(bus_id=body.bus_id, year=body.year, month=body.month, estimated=0.0)
         db.add(fm)
+    parts = []
     if body.estimated is not None:
-        fm.estimated = body.estimated
+        fm.estimated = body.estimated; parts.append(f"estimé {body.estimated:.0f}")
     if body.actual is not None:
-        fm.actual = body.actual
+        fm.actual = body.actual; parts.append(f"réel {body.actual:.0f}")
+    bus = db.get(models.Bus, body.bus_id)
+    log_action(db, _admin, "Carburant",
+          f"{bus.name if bus else body.bus_id} {body.month:02d}/{body.year}: " + ", ".join(parts))
     db.commit(); db.refresh(fm)
     return fm
 
@@ -453,6 +462,21 @@ def _excursion_out(b: models.Booking) -> dict:
         "multi_day": (b.end_date is not None and b.end_date != b.date),
     }
 
+def _describe_exc(db: Session, b: models.Booking) -> str:
+    """Short human label of an excursion for the Journal, e.g.
+    'BUS ISKANDER 371 — 10/05, Zarzis, 3 pax, 450 TND'."""
+    bus = db.get(models.Bus, b.bus_id)
+    span = b.date.strftime("%d/%m")
+    if b.end_date and b.end_date != b.date:
+        span += "→" + b.end_date.strftime("%d/%m")
+    what = b.destination or b.type
+    parts = [bus.name if bus else f"#{b.bus_id}", span, what]
+    if b.type == "Booking":
+        if b.pax:
+            parts.append(f"{b.pax} pax")
+        parts.append(f"{(b.total or 0):.0f} TND")
+    return " — ".join(parts[:2]) + ", " + ", ".join(parts[2:])
+
 def _require_contract(db: Session, bus_id: int, d: date):
     cov = (db.query(models.Contract)
            .filter(models.Contract.bus_id == bus_id,
@@ -514,7 +538,9 @@ def excursions_for_day(bus_id: int, day_iso: str, db: Session = Depends(get_db))
 def create_excursion(body: schemas.ExcursionIn, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     b = models.Booking()
     _apply_excursion(db, b, body)
-    db.add(b); db.commit(); db.refresh(b)
+    db.add(b); db.flush()
+    log_action(db, _admin, "Excursion", "Ajout : " + _describe_exc(db, b))
+    db.commit(); db.refresh(b)
     return _excursion_out(b)
 
 
@@ -523,7 +549,12 @@ def update_excursion(exc_id: int, body: schemas.ExcursionIn, db: Session = Depen
     b = db.get(models.Booking, exc_id)
     if not b:
         raise HTTPException(404, "Excursion introuvable.")
+    before = _describe_exc(db, b)
     _apply_excursion(db, b, body)
+    db.flush()
+    after = _describe_exc(db, b)
+    detail = after if after == before else f"{before}  ➜  {after}"
+    log_action(db, _admin, "Excursion", "Modification : " + detail)
     db.commit(); db.refresh(b)
     return _excursion_out(b)
 
@@ -532,7 +563,10 @@ def update_excursion(exc_id: int, body: schemas.ExcursionIn, db: Session = Depen
 def delete_excursion(exc_id: int, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     b = db.get(models.Booking, exc_id)
     if b:
-        db.delete(b); db.commit()
+        detail = _describe_exc(db, b)
+        db.delete(b)
+        log_action(db, _admin, "Excursion", "Suppression : " + detail)
+        db.commit()
 
 
 @app.get("/api/coverage/{bus_id}/{day_iso}")
@@ -604,5 +638,6 @@ def save_day(body: schemas.DaySave, db: Session = Depends(get_db), _admin: str =
             ))
         saved += 1
 
+    log_action(db, _admin, "Journée", f"{bus.name}, {body.date.strftime('%d/%m/%Y')} : {saved} ligne(s) enregistrée(s)")
     db.commit()
     return {"ok": True, "saved": saved}
