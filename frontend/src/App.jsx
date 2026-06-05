@@ -37,8 +37,8 @@ export default function App() {
     <div className="min-h-full bg-slate-100 text-slate-800">
       <header className="sticky top-0 z-40 bg-[#1a3a5c] text-white shadow-lg">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <BusLogo />
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🚌</span>
             <div>
               <div className="text-sm font-extrabold leading-tight tracking-tight">Bestimetravel</div>
               <div className="text-[11px] text-sky-200">Gestion des Bus</div>
@@ -65,29 +65,6 @@ export default function App() {
         </ErrorBoundary>
       </main>
     </div>
-  );
-}
-
-function BusLogo() {
-  return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-black/5">
-      <svg viewBox="0 0 24 24" className="h-6 w-6" aria-label="Bus">
-        {/* body */}
-        <rect x="3" y="4.5" width="18" height="12" rx="2.6" fill="#f59e0b" />
-        {/* window strip */}
-        <rect x="4.6" y="6.4" width="14.8" height="3.7" rx="1" fill="#bae6fd" />
-        {/* window dividers */}
-        <line x1="9.3" y1="6.4" x2="9.3" y2="10.1" stroke="#f59e0b" strokeWidth="1" />
-        <line x1="14" y1="6.4" x2="14" y2="10.1" stroke="#f59e0b" strokeWidth="1" />
-        {/* headlight */}
-        <circle cx="20.2" cy="12" r="0.7" fill="#fff7ed" />
-        {/* wheels */}
-        <circle cx="8" cy="17" r="2.1" fill="#1a3a5c" />
-        <circle cx="8" cy="17" r="0.8" fill="#e2e8f0" />
-        <circle cx="16" cy="17" r="2.1" fill="#1a3a5c" />
-        <circle cx="16" cy="17" r="0.8" fill="#e2e8f0" />
-      </svg>
-    </span>
   );
 }
 
