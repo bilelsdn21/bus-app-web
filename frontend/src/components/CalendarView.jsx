@@ -63,19 +63,19 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="text-white">
-                  <th className="sticky left-0 top-0 z-30 bg-[#1a3a5c] px-3 py-2 text-left font-semibold min-w-[190px]">Véhicule</th>
+                  <th className="sticky left-0 top-0 z-30 border-r border-white/20 bg-[#1a3a5c] px-3 py-2 text-left font-semibold min-w-[190px]">Véhicule</th>
                   {Array.from({ length: data.days_in_month }, (_, i) => {
                     const day = i + 1;
                     const dow = new Date(data.year, data.month - 1, day).getDay(); // 0=dim … 6=sam
                     const weekend = dow === 0 || dow === 6;
                     return (
-                      <th key={i} className={`sticky top-0 z-20 w-7 px-0.5 py-1 text-center font-medium ${weekend ? "bg-[#24507a]" : "bg-[#1a3a5c]"}`}>
+                      <th key={i} className={`sticky top-0 z-20 w-7 border-r border-white/10 px-0.5 py-1 text-center font-medium ${weekend ? "bg-[#24507a]" : "bg-[#1a3a5c]"}`}>
                         <div className={`text-[9px] font-semibold uppercase leading-none ${weekend ? "text-amber-300" : "text-sky-300"}`}>{WEEKDAYS_FR[dow]}</div>
                         <div className="leading-tight">{day}</div>
                       </th>
                     );
                   })}
-                  <th className="sticky top-0 z-20 bg-[#1a3a5c] px-3 py-2 text-right font-semibold min-w-[120px]">Net Mois</th>
+                  <th className="sticky top-0 z-20 border-l border-white/20 bg-[#1a3a5c] px-3 py-2 text-right font-semibold min-w-[120px]">Net Mois</th>
                   <th className="sticky top-0 z-20 bg-[#1a3a5c] px-3 py-2 text-center font-semibold min-w-[70px]">%</th>
                   <th className="sticky top-0 z-20 bg-[#1a3a5c] px-3 py-2 text-right font-semibold min-w-[90px]">Distance</th>
                 </tr>
@@ -95,14 +95,17 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                           </td>
                         </tr>
                       )}
-                      <tr key={bus.id} className="border-b border-slate-100 odd:bg-slate-50/60 hover:bg-sky-50">
-                        <td className="sticky left-0 z-10 bg-inherit px-3 py-1.5 font-semibold text-slate-700 truncate max-w-[190px]" title={bus.name}>
+                      <tr key={bus.id} className="border-b border-slate-200 odd:bg-slate-50/60 hover:bg-sky-50">
+                        <td className="sticky left-0 z-10 border-r border-slate-300 bg-inherit px-3 py-1.5 font-semibold text-slate-700 truncate max-w-[190px]" title={bus.name}>
                           {bus.name}
                         </td>
                         {Array.from({ length: data.days_in_month }, (_, i) => {
-                          const c = bus.days[i + 1];
+                          const day = i + 1;
+                          const c = bus.days[day];
+                          const dow = new Date(data.year, data.month - 1, day).getDay();
+                          const weekend = dow === 0 || dow === 6;
                           return (
-                            <td key={i} className="px-0.5 py-1.5 text-center">
+                            <td key={i} className={`border-r border-slate-200 px-0.5 py-1.5 text-center ${weekend ? "bg-slate-100/50" : ""}`}>
                               {c ? (
                                 <button onClick={() => openDay(bus, i + 1)} title={`${DOT[c]?.label} — voir le détail`}
                                   className={`inline-block h-3.5 w-3.5 rounded-full ${DOT[c]?.bg || "bg-slate-300"} transition hover:scale-150 hover:ring-2 hover:ring-sky-300`} />
@@ -112,7 +115,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                             </td>
                           );
                         })}
-                        <td className="px-3 py-1.5 text-right">
+                        <td className="border-l border-slate-300 px-3 py-1.5 text-right">
                           {net == null ? (
                             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-400" title="Aucun contrat pour ce mois">Pas de contrat</span>
                           ) : (
