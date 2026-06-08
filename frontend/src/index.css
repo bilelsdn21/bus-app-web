@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
 :root { color-scheme: light; }
-html, body, #root { height: 100%; }
-body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+/* Navy behind everything so any gap above the sticky header (mobile overscroll,
+   toolbar collapse, safe-area) blends into the nav bar instead of flashing white. */
+html { height: 100%; background-color: #1a3a5c; }
+
+/* min-height (not fixed height) so the page grows with content and the sticky
+   header stays pinned the whole way down. overscroll-behavior stops the rubber-band
+   bounce that revealed the background. */
+body { min-height: 100%; margin: 0; overscroll-behavior-y: none;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#root { min-height: 100%; }
