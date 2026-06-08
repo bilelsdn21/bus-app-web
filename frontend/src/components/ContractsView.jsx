@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import { fmtTND } from "../colors.js";
+import { useAutoRefresh } from "../useAutoRefresh.js";
 
 const MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jui", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 
@@ -23,6 +24,7 @@ export default function ContractsView({ readOnly = false }) {
       .catch((e) => setErr(e.message));
   };
   useEffect(() => { reload(); }, [busId]);
+  useAutoRefresh(reload);   // refetch when the app regains focus / reconnects (mobile)
 
   const saveContract = async () => {
     setErr("");

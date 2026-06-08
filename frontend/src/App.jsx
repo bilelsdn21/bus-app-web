@@ -49,8 +49,9 @@ export default function App() {
               <Tab key={key} on={effMode === key} onClick={() => setMode(key)}>{label}</Tab>
             ))}
           </nav>
-          <button onClick={logout} title="Déconnexion" className="hidden items-center gap-1 rounded-lg px-2 py-1 text-xs text-sky-200 hover:bg-white/10 hover:text-white sm:flex">
-            {auth.username}{!isAdmin && <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold uppercase">lecture</span>} ⏻
+          <button onClick={logout} title="Déconnexion" className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs text-sky-200 hover:bg-white/10 hover:text-white">
+            <span className="hidden sm:inline">{auth.username}{!isAdmin && <span className="ml-1 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold uppercase">lecture</span>}</span>
+            <span className="text-base leading-none">⏻</span>
           </button>
         </div>
       </header>

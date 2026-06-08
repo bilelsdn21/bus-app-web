@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { DOT, fmtTND } from "../colors.js";
 import ExcursionEditor from "./ExcursionEditor.jsx";
+import { useAutoRefresh } from "../useAutoRefresh.js";
 
 // French weekday abbreviations, indexed by JS getDay() (0=Sunday … 6=Saturday)
 const WEEKDAYS_FR = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
@@ -26,6 +27,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
   }, [year, month]);
 
   useEffect(() => { api.destinations().then(setDests).catch(() => {}); }, []);
+  useAutoRefresh(reload);   // refetch when the app regains focus / reconnects (mobile)
 
   const prev = () => { if (month === 1) { setMonth(12); setYear(year - 1); } else setMonth(month - 1); };
   const next = () => { if (month === 12) { setMonth(1); setYear(year + 1); } else setMonth(month + 1); };
