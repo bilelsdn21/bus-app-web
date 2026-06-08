@@ -97,7 +97,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                           </td>
                         </tr>
                       )}
-                      <tr key={bus.id} className="border-b border-slate-200 odd:bg-slate-50/60 hover:bg-sky-50">
+                      <tr key={bus.id} className="border-b border-slate-200 bg-white odd:bg-slate-50 hover:bg-sky-50">
                         <td className="sticky left-0 z-10 border-r border-slate-300 bg-inherit px-3 py-1.5 font-semibold text-slate-700 truncate max-w-[190px]" title={bus.name}>
                           {bus.name}
                         </td>
