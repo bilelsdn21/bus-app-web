@@ -49,6 +49,16 @@ def main():
         print(f"  {t:14} {counts[t]} rows")
     print(f"  total {sum(counts.values())} rows")
 
+    # retention: keep only the most recent BACKUP_KEEP files (default 90)
+    keep = int(os.environ.get("BACKUP_KEEP", "90"))
+    files = sorted(backup_dir.glob("bus_db_backup_*.json"))
+    for old in files[:-keep] if keep > 0 else []:
+        try:
+            old.unlink()
+            print("Pruned old backup:", old.name)
+        except OSError:
+            pass
+
 
 if __name__ == "__main__":
     main()
