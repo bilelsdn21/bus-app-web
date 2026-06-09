@@ -19,6 +19,12 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
   const load = () => api.excursionsForDay(bus.id, dayISO).then(setRows).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, [bus.id, dayISO]);
 
+  const categories = useMemo(() => {
+    const cats = [...new Set(dests.map((d) => d.category).filter(Boolean))];
+    return [...cats, ...UNAVAIL];
+  }, [dests]);
+  const destsForCat = (c) => dests.filter((d) => d.category === c);
+
   // check contract coverage for the form's start date
   useEffect(() => {
     if (!form) { setCover(null); return; }
@@ -108,20 +114,16 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
                 <L label="Du"><input type="date" className={inp} value={form.start_date} onChange={(ev) => setForm({ ...form, start_date: ev.target.value, end_date: ev.target.value > form.end_date ? ev.target.value : form.end_date })} /></L>
                 <L label="Au (multi-jours)"><input type="date" min={form.start_date} className={inp} value={form.end_date} onChange={(ev) => setForm({ ...form, end_date: ev.target.value })} /></L>
               </div>
-              {/* type-to-search destination (auto-fills the category) */}
-              <DestPicker
-                value={UNAVAIL.includes(form.category) ? "" : form.destination}
-                dests={dests}
-                onPick={(d) => setForm({ ...form, destination: d.name, category: d.category || "Excursion" })}
-              />
-              {/* …or mark the vehicle unavailable */}
-              <select className={inp} value={UNAVAIL.includes(form.category) ? form.category : ""}
-                onChange={(ev) => setForm({ ...form, category: ev.target.value, destination: ev.target.value ? "" : form.destination })}>
-                <option value="">— ou marquer indisponible —</option>
-                {UNAVAIL.map((u) => <option key={u} value={u}>{u}</option>)}
+              <select className={inp} value={form.category} onChange={(ev) => setForm({ ...form, category: ev.target.value, destination: "" })}>
+                <option value="">— Catégorie —</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              {form.destination && !UNAVAIL.includes(form.category) && (
+              {form.category && !UNAVAIL.includes(form.category) && (
                 <>
+                  <select className={inp} value={form.destination} onChange={(ev) => setForm({ ...form, destination: ev.target.value })}>
+                    <option value="">— Destination —</option>
+                    {destsForCat(form.category).map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
                   <input className={inp} placeholder="Client (optionnel)" value={form.client} onChange={(ev) => setForm({ ...form, client: ev.target.value })} />
                   <div className="grid grid-cols-3 gap-2">
                     <input type="number" min="0" className={inp} placeholder="Pax" value={form.pax} onChange={(ev) => setForm({ ...form, pax: ev.target.value })} />
@@ -133,7 +135,7 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
               {blocked && <div className="rounded bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800">⛔ Aucun contrat ne couvre cette date — créez un contrat d'abord.</div>}
               <div className="flex justify-end gap-2 pt-1">
                 <button onClick={() => setForm(null)} disabled={saving} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-100 disabled:opacity-50">Annuler</button>
-                <button onClick={save} disabled={saving || blocked || (UNAVAIL.includes(form.category) ? false : !form.destination)} className="rounded-lg bg-[#1a3a5c] px-3 py-1.5 text-sm font-bold text-white hover:bg-[#234d77] disabled:opacity-50">{saving ? "Enregistrement…" : "Enregistrer"}</button>
+                <button onClick={save} disabled={saving || !form.category || blocked} className="rounded-lg bg-[#1a3a5c] px-3 py-1.5 text-sm font-bold text-white hover:bg-[#234d77] disabled:opacity-50">{saving ? "Enregistrement…" : "Enregistrer"}</button>
               </div>
             </div>
           )}
@@ -164,45 +166,3 @@ const Time = ({ value, onChange, ph }) => (
   </select>
 );
 const guessCat = (dests, name) => dests.find((d) => d.name === name)?.category || "";
-
-// Type-to-search destination picker. Filters all destinations by name or category.
-function DestPicker({ value, dests, onPick }) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const list = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    const arr = s
-      ? dests.filter((d) => d.name.toLowerCase().includes(s) || (d.category || "").toLowerCase().includes(s))
-      : dests;
-    return arr.slice(0, 60);
-  }, [q, dests]);
-  return (
-    <div className="relative">
-      <input
-        className={inp}
-        value={open ? q : (value || "")}
-        placeholder="🔎 Rechercher une destination…"
-        onFocus={() => { setOpen(true); setQ(""); }}
-        onChange={(e) => { setQ(e.target.value); setOpen(true); }}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-      />
-      {open && (
-        <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-xl">
-          {list.length === 0 && <li className="px-3 py-2 text-sm text-slate-400">Aucun résultat</li>}
-          {list.map((d) => (
-            <li key={d.id}>
-              <button
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); onPick(d); setOpen(false); }}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-sky-50"
-              >
-                <span className="truncate">{d.name}</span>
-                {d.category && <span className="shrink-0 text-[11px] text-slate-400">{d.category}</span>}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
