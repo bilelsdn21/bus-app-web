@@ -20,6 +20,32 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// Show a notification when a push arrives (works even when the app is closed)
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = {}; }
+  e.waitUntil(
+    self.registration.showNotification(d.title || "Bestimetravel", {
+      body: d.body || "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: d.url || "/" },
+    })
+  );
+});
+
+// Focus the app (or open it) when the notification is tapped
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "/";
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) { if ("focus" in w) return w.focus(); }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return; // never cache writes

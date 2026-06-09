@@ -5,6 +5,7 @@ import ContractsView from "./components/ContractsView.jsx";
 import SettingsView from "./components/SettingsView.jsx";
 import JournalView from "./components/JournalView.jsx";
 import Login from "./components/Login.jsx";
+import NotifyButton from "./components/NotifyButton.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 export default function App() {
@@ -49,10 +50,13 @@ export default function App() {
               <Tab key={key} on={effMode === key} onClick={() => setMode(key)}>{label}</Tab>
             ))}
           </nav>
+          <div className="flex shrink-0 items-center gap-1">
+          <NotifyButton />
           <button onClick={logout} title="Déconnexion" className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs text-sky-200 hover:bg-white/10 hover:text-white">
             <span className="hidden sm:inline">{auth.username}{!isAdmin && <span className="ml-1 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold uppercase">lecture</span>}</span>
             <span className="text-base leading-none">⏻</span>
           </button>
+          </div>
         </div>
       </header>
 

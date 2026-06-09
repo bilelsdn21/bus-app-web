@@ -58,4 +58,9 @@ export const api = {
   setConfig: (p) => req(`/api/config`, { method: "PUT", body: JSON.stringify(p) }),
 
   audit: () => req(`/api/audit`),
+
+  pushKey: () => req(`/api/push/key`),
+  pushSubscribe: (sub) => req(`/api/push/subscribe`, { method: "POST", body: JSON.stringify(sub) }),
+  pushUnsubscribe: (sub) => req(`/api/push/unsubscribe`, { method: "POST", body: JSON.stringify(sub) }),
+  notifyTest: () => req(`/api/notify/test`, { method: "POST" }),
 };

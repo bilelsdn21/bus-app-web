@@ -95,3 +95,14 @@ class AuditLog(Base):
     path       = Column(String)   # /api/excursions/5 ...
     status     = Column(Integer)  # HTTP status returned
     detail     = Column(Text, default="")
+
+
+class PushSubscription(Base):
+    """A browser/phone that opted in to push notifications."""
+    __tablename__ = "push_subscriptions"
+    id         = Column(Integer, primary_key=True)
+    endpoint   = Column(String, nullable=False, unique=True)
+    p256dh     = Column(String, nullable=False)
+    auth       = Column(String, nullable=False)
+    username   = Column(String, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)

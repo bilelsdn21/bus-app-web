@@ -1,0 +1,19 @@
+name: Weekly notification
+
+# Sends the monthly summary push to all subscribed phones.
+# Monday 07:00 UTC = 08:00 Tunisia (UTC+1). Change the cron to reschedule.
+# Also runnable on demand from the Actions tab ("Run workflow").
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger weekly summary
+        run: |
+          curl -fsS -X POST "https://bus-app-backend-8gc4.onrender.com/api/notify/weekly" \
+            -H "X-Notify-Secret: ${{ secrets.NOTIFY_SECRET }}" \
+            -w "\nHTTP %{http_code}\n"

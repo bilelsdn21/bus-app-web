@@ -54,6 +54,15 @@ def authenticate(username: str, password: str) -> dict | None:
     return {"username": username, "role": info["role"], "token": _token(username)}
 
 
+def require_user(authorization: str = Header(None)) -> str:
+    """FastAPI dependency: allow any authenticated account (admin OR viewer),
+    returning the username. Used for actions everyone may do (e.g. opt into push)."""
+    tok = _bearer(authorization)
+    if tok not in TOKENS:
+        raise HTTPException(401, "Non authentifié — reconnectez-vous.")
+    return TOKEN_USER.get(tok, "?")
+
+
 def require_admin(authorization: str = Header(None)) -> str:
     """FastAPI dependency: allow only admin tokens, and return the acting
     username (so endpoints can record WHO acted in the Journal)."""
