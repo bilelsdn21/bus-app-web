@@ -11,6 +11,7 @@ Run:  uvicorn app.main:app --reload --port 8000
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from .core.database import Base, engine
 from .core.config import cors_origins
@@ -20,6 +21,18 @@ from .controllers import (
 )
 
 Base.metadata.create_all(engine)
+
+# Security: on Postgres (Supabase) keep Row-Level Security ENABLED on every table
+# so the auto-exposed public REST API can't read/write the data. The backend
+# connects as the table owner and bypasses RLS, so this doesn't affect us. Runs
+# every startup (idempotent) so a re-seed or a new table can't silently re-expose.
+if engine.dialect.name == "postgresql":
+    try:
+        with engine.begin() as _conn:
+            for _t in Base.metadata.tables:
+                _conn.execute(text(f'ALTER TABLE public."{_t}" ENABLE ROW LEVEL SECURITY'))
+    except Exception:
+        pass  # never block startup on this
 
 app = FastAPI(title="Bus Manager API")
 
