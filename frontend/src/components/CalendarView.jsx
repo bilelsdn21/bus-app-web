@@ -7,7 +7,7 @@ import { useAutoRefresh } from "../useAutoRefresh.js";
 // French weekday abbreviations, indexed by JS getDay() (0=Sunday … 6=Saturday)
 const WEEKDAYS_FR = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
 
-export default function CalendarView({ year, month, setYear, setMonth, readOnly = false }) {
+export default function CalendarView({ year, month, setYear, setMonth, readOnly = false, username = "" }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -38,9 +38,27 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
   };
 
   let region = null;
+  const todayLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const monthNet = data?.summary?.total?.net;
 
   return (
     <div className="space-y-5">
+      {/* personalized cockpit band */}
+      <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#13294a] via-[#1a3a5c] to-[#21507e] px-5 py-4 text-white shadow-lg ring-1 ring-amber-400/20">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-base font-bold sm:text-lg">Bonjour {username || ""} <span className="text-amber-300">👋</span></div>
+            <div className="text-[11px] capitalize text-sky-200">{todayLabel}</div>
+          </div>
+          {monthNet != null && (
+            <div className="text-right">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">{data.label} · Net</div>
+              <div className={`text-xl font-extrabold ${monthNet >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{fmtTND(monthNet)}</div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <button onClick={prev} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">← Préc.</button>
         <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">{data?.label || `${month}/${year}`}</h1>
@@ -57,7 +75,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
       </div>
 
       {error && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
-      {loading && <div className="py-10 text-center text-slate-400">Chargement…</div>}
+      {loading && <CalendarSkeleton />}
 
       {data && !loading && (
         <>
@@ -229,6 +247,27 @@ function SummaryCard({ r, grand }) {
             {fmtTND(r.net)} <span className="text-xs font-semibold">({r.pct})</span>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CalendarSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
+        <div className="h-11 bg-slate-200" />
+        <div className="space-y-3 p-4">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="h-4 w-44 rounded bg-slate-200" />
+              <div className="h-3 flex-1 rounded bg-slate-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-slate-100" />)}
       </div>
     </div>
   );

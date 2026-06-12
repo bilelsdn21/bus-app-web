@@ -68,11 +68,13 @@ export default function App() {
 
       <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
         <ErrorBoundary key={effMode}>
-          {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} />}
-          {effMode === "contracts" && <ContractsView readOnly={!isAdmin} />}
-          {effMode === "entry" && <DayEntry />}
-          {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
-          {effMode === "journal" && <JournalView />}
+          <div className="animate-fadein">
+            {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} username={auth.username} />}
+            {effMode === "contracts" && <ContractsView readOnly={!isAdmin} />}
+            {effMode === "entry" && <DayEntry />}
+            {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
+            {effMode === "journal" && <JournalView />}
+          </div>
         </ErrorBoundary>
       </main>
     </div>

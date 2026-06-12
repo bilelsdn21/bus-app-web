@@ -12,3 +12,7 @@ html { height: 100%; background-color: #1a3a5c; }
 body { min-height: 100%; margin: 0; overscroll-behavior-y: none;
   font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 #root { min-height: 100%; }
+
+/* subtle content fade-in on tab switch */
+@keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.animate-fadein { animation: fadein .28s ease-out both; }
