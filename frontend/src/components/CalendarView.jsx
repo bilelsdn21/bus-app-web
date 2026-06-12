@@ -84,13 +84,24 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
             <span className={`inline-block h-3 w-3 rounded-full ${v.bg}`} /> {v.label}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="cell-out inline-block h-3 w-3 rounded ring-1 ring-slate-200" /> Hors contrat
+        </span>
         <span className="text-slate-400">· cliquez une case jour pour {readOnly ? "voir" : "ajouter / modifier"} les excursions</span>
       </div>
 
       {error && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
       {loading && <CalendarSkeleton />}
 
-      {data && !loading && (
+      {data && !loading && data.buses.length === 0 && (
+        <div className="rounded-2xl bg-white px-6 py-14 text-center shadow ring-1 ring-slate-200">
+          <div className="text-3xl">🗓️</div>
+          <div className="mt-2 font-semibold text-slate-600">Aucun véhicule sous contrat ce mois-ci</div>
+          <div className="mt-1 text-sm text-slate-400">Créez un contrat (onglet Contrats) couvrant cette période pour afficher un véhicule ici.</div>
+        </div>
+      )}
+
+      {data && !loading && data.buses.length > 0 && (
         <>
           <div className="max-h-[75vh] overflow-auto rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
             <table className="w-full border-collapse text-xs">
@@ -118,6 +129,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                   const sep = bus.region !== region;
                   region = bus.region;
                   const net = bus.net;
+                  const covered = bus.covered_days ? new Set(bus.covered_days) : null;
                   return (
                     <>
                       {sep && (
@@ -138,15 +150,18 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                         {Array.from({ length: data.days_in_month }, (_, i) => {
                           const day = i + 1;
                           const c = bus.days[day];
+                          const out = covered && !covered.has(day);   // hors contrat
                           const dow = new Date(data.year, data.month - 1, day).getDay();
                           const weekend = dow === 0 || dow === 6;
                           return (
-                            <td key={i} className={`border-r border-slate-200 px-0.5 py-1.5 text-center ${weekend ? "bg-slate-100/50" : ""}`}>
+                            <td key={i} className={`border-r border-slate-200 px-0.5 py-1.5 text-center ${out ? "cell-out" : weekend ? "bg-slate-100/50" : ""}`}>
                               {c ? (
-                                <button onClick={() => openDay(bus, i + 1)} title={`${DOT[c]?.label} — voir le détail`}
+                                <button onClick={() => openDay(bus, day)} title={`${DOT[c]?.label} — voir le détail`}
                                   className={`inline-block h-3.5 w-3.5 rounded-full ${DOT[c]?.bg || "bg-slate-300"} transition hover:scale-150 hover:ring-2 hover:ring-sky-300`} />
+                              ) : out ? (
+                                <span className="inline-block h-3.5 w-3.5" title="Hors contrat" aria-hidden="true" />
                               ) : (
-                                <button onClick={() => openDay(bus, i + 1)} className="block h-3.5 w-3.5 opacity-0 hover:opacity-100" aria-label="jour" />
+                                <button onClick={() => openDay(bus, day)} className="block h-3.5 w-3.5 opacity-0 hover:opacity-100" aria-label="jour" />
                               )}
                             </td>
                           );

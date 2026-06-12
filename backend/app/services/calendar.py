@@ -45,8 +45,23 @@ def build_calendar(db: Session, year: int, month: int) -> dict:
     bus_list = []
     sum_rows = []   # for region summary (contract-aware)
     for bus in buses:
+        # a vehicle is on the calendar this month ONLY if a contract overlaps it
+        overlapping = [c for c in contracts_by_bus.get(bus.id, [])
+                       if _overlap_days(c.start_date, c.end_date, start, end) > 0]
+        if not overlapping:
+            continue  # no contract this month -> the vehicle does not appear
+
+        # the days of THIS month covered by any of the vehicle's contracts
+        # (so a contract ending/starting mid-month grays out the rest)
+        covered = set()
+        for c in overlapping:
+            s = max(c.start_date, start)
+            e = min(c.end_date, end)
+            for off in range((e - s).days + 1):
+                covered.add((s + timedelta(days=off)).day)
+
         bd = {"id": bus.id, "name": bus.name, "type": bus.type, "region": bus.region,
-              "distance": bus.distance}
+              "distance": bus.distance, "covered_days": sorted(covered)}
         days = {}
         for day in range(1, end.day + 1):
             ds = date(year, month, day).isoformat()
@@ -55,30 +70,23 @@ def build_calendar(db: Session, year: int, month: int) -> dict:
                 days[day] = calc.day_color(cell, cfg.cut_morn, cfg.cut_night)
         bd["days"] = days
 
-        # pick the contract that overlaps the viewed month the most
+        # net = result of the contract overlapping the viewed month the most
         chosen, best = None, 0
-        for c in contracts_by_bus.get(bus.id, []):
+        for c in overlapping:
             ov = _overlap_days(c.start_date, c.end_date, start, end)
             if ov > best:
                 chosen, best = c, ov
-
-        if chosen:
-            res = compute_contract_result(db, chosen)
-            bd.update({
-                "net": res["net"], "pct": res["pct"], "is_estimated": res["is_estimated"],
-                "contract": {
-                    "id": chosen.id, "label": chosen.label,
-                    "start_date": chosen.start_date.isoformat(),
-                    "end_date": chosen.end_date.isoformat(),
-                    "revenue": res["revenue"], "loyer": res["loyer"], "fuel": res["fuel"],
-                },
-            })
-            sum_rows.append({"region": bus.region or "—", "loyer": res["loyer"], "net": res["net"]})
-        else:
-            # no contract covering this month -> nothing to compute (rent lives on contracts)
-            bd.update({"net": None, "pct": "—", "is_estimated": False, "contract": None, "no_contract": True})
-            sum_rows.append({"region": bus.region or "—", "loyer": 0.0, "net": 0.0})
-
+        res = compute_contract_result(db, chosen)
+        bd.update({
+            "net": res["net"], "pct": res["pct"], "is_estimated": res["is_estimated"],
+            "contract": {
+                "id": chosen.id, "label": chosen.label,
+                "start_date": chosen.start_date.isoformat(),
+                "end_date": chosen.end_date.isoformat(),
+                "revenue": res["revenue"], "loyer": res["loyer"], "fuel": res["fuel"],
+            },
+        })
+        sum_rows.append({"region": bus.region or "—", "loyer": res["loyer"], "net": res["net"]})
         bus_list.append(bd)
 
     # region summary from the contract-aware rows
