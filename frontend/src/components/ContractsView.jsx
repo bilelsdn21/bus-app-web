@@ -5,7 +5,7 @@ import { useAutoRefresh } from "../useAutoRefresh.js";
 
 const MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jui", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 
-export default function ContractsView({ readOnly = false }) {
+export default function ContractsView({ readOnly = false, initialBusId = null }) {
   const [buses, setBuses] = useState([]);
   const [busId, setBusId] = useState("");
   const [contracts, setContracts] = useState([]);
@@ -14,7 +14,11 @@ export default function ContractsView({ readOnly = false }) {
   const [form, setForm] = useState(null); // contract being added/edited
 
   useEffect(() => {
-    api.buses().then((b) => { setBuses(b); if (b[0]) setBusId(String(b[0].id)); }).catch((e) => setErr(e.message));
+    api.buses().then((b) => {
+      setBuses(b);
+      const pick = (initialBusId && b.some((x) => x.id === initialBusId)) ? initialBusId : b[0]?.id;
+      if (pick) setBusId(String(pick));
+    }).catch((e) => setErr(e.message));
   }, []);
 
   const reload = () => {

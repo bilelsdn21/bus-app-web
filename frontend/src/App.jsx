@@ -23,10 +23,12 @@ export default function App() {
   const [now] = useState(() => new Date());
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [contractBus, setContractBus] = useState(null); // bus to pre-open in Contrats
 
   if (!auth) return <Login onLogin={setAuth} />;
 
   const logout = () => { api.logout().catch(() => {}); localStorage.removeItem("bus_auth"); setAuth(null); };
+  const openContract = (busId) => { setContractBus(busId); setMode("contracts"); };
 
   // tabs allowed per role. Viewer sees Calendrier + Contrats + Params (all read-only);
   // admins also get Saisie; the Journal (private monitoring) is OWNER-only.
@@ -72,8 +74,8 @@ export default function App() {
       <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
         <ErrorBoundary key={effMode}>
           <div className="animate-fadein">
-            {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} username={auth.username} />}
-            {effMode === "contracts" && <ContractsView readOnly={!isAdmin} />}
+            {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} username={auth.username} onOpenContract={openContract} />}
+            {effMode === "contracts" && <ContractsView readOnly={!isAdmin} initialBusId={contractBus} />}
             {effMode === "entry" && <DayEntry />}
             {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
             {effMode === "journal" && <JournalView />}

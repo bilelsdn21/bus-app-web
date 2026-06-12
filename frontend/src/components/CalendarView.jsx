@@ -7,7 +7,7 @@ import { useAutoRefresh } from "../useAutoRefresh.js";
 // French weekday abbreviations, indexed by JS getDay() (0=Sunday … 6=Saturday)
 const WEEKDAYS_FR = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
 
-export default function CalendarView({ year, month, setYear, setMonth, readOnly = false, username = "" }) {
+export default function CalendarView({ year, month, setYear, setMonth, readOnly = false, username = "", onOpenContract }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -116,8 +116,11 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                         </tr>
                       )}
                       <tr key={bus.id} className="border-b border-slate-200 bg-white odd:bg-slate-50 hover:bg-sky-50">
-                        <td className="sticky left-0 z-10 border-r border-slate-300 bg-inherit px-3 py-1.5 font-semibold text-slate-700 truncate max-w-[190px]" title={bus.name}>
-                          {bus.name}
+                        <td className="sticky left-0 z-10 max-w-[190px] border-r border-slate-300 bg-inherit p-0">
+                          <button onClick={() => onOpenContract?.(bus.id)} title={`Voir le contrat — ${bus.name}`}
+                            className="block w-full truncate px-3 py-1.5 text-left font-semibold text-slate-700 transition hover:bg-sky-50 hover:text-sky-700">
+                            {bus.name}
+                          </button>
                         </td>
                         {Array.from({ length: data.days_in_month }, (_, i) => {
                           const day = i + 1;
