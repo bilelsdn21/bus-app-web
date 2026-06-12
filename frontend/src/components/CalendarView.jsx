@@ -6,6 +6,10 @@ import { useAutoRefresh } from "../useAutoRefresh.js";
 
 // French weekday abbreviations, indexed by JS getDay() (0=Sunday … 6=Saturday)
 const WEEKDAYS_FR = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
+const MONTHS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+// Selectable years: from 2025 up to next year (extends automatically over time).
+const YEARS = (() => { const a = []; for (let y = 2025; y <= new Date().getFullYear() + 1; y++) a.push(y); return a; })();
 
 export default function CalendarView({ year, month, setYear, setMonth, readOnly = false, username = "", onOpenContract }) {
   const [data, setData] = useState(null);
@@ -59,10 +63,19 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <button onClick={prev} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">← Préc.</button>
-        <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">{data?.label || `${month}/${year}`}</h1>
-        <button onClick={next} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">Suiv. →</button>
+      <div className="flex items-center justify-between gap-2">
+        <button onClick={prev} title="Mois précédent" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">←</button>
+        <div className="flex items-center gap-1.5">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}
+            className="cursor-pointer rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-bold text-[#1a3a5c] shadow-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 sm:text-base">
+            {MONTHS_FR.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+          </select>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}
+            className="cursor-pointer rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-bold text-[#1a3a5c] shadow-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 sm:text-base">
+            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <button onClick={next} title="Mois suivant" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">→</button>
       </div>
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-600">
