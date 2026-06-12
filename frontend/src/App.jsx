@@ -6,6 +6,7 @@ import SettingsView from "./components/SettingsView.jsx";
 import JournalView from "./components/JournalView.jsx";
 import Login from "./components/Login.jsx";
 import NotifyButton from "./components/NotifyButton.jsx";
+import Logo from "./components/Logo.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 export default function App() {
@@ -36,13 +37,15 @@ export default function App() {
 
   return (
     <div className="min-h-full bg-slate-100 text-slate-800">
-      <header className="sticky top-0 z-40 bg-[#1a3a5c] text-white shadow-lg">
+      <header className="sticky top-0 z-40 border-b border-amber-400/30 bg-gradient-to-r from-[#13294a] via-[#1a3a5c] to-[#1f4a76] text-white shadow-lg">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🚌</span>
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
+              <Logo className="h-6 w-6" />
+            </span>
             <div>
               <div className="text-sm font-extrabold leading-tight tracking-tight">Bestimetravel</div>
-              <div className="text-[11px] text-sky-200">Gestion des Bus</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-300/90">Gestion des Bus</div>
             </div>
           </div>
           <nav className="flex flex-wrap gap-1 rounded-xl bg-white/10 p-1">
