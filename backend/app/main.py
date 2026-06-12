@@ -36,11 +36,24 @@ if engine.dialect.name == "postgresql":
 
 app = FastAPI(title="Bus Manager API")
 
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return resp
+
+
+# Auth is via Bearer token (not cookies), so credentials aren't needed -> keep
+# them off, which makes the allowed-origins surface much lower-risk.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins(),
     allow_origin_regex=r"https://.*\.vercel\.app",  # production + Vercel previews
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

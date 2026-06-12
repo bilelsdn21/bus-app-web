@@ -17,6 +17,12 @@ async function req(path, opts = {}) {
     },
   });
   if (!res.ok) {
+    // Session expired/invalid while we DID send a token -> log out to the login screen.
+    if (res.status === 401 && token) {
+      localStorage.removeItem("bus_auth");
+      location.reload();
+      throw new Error("Session expirée — reconnectez-vous.");
+    }
     let msg = `Erreur ${res.status}`;
     try { msg = (await res.json()).detail || msg; } catch {}
     throw new Error(msg);
