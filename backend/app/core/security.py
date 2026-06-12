@@ -111,10 +111,21 @@ def require_user(authorization: str = Header(None)) -> str:
 
 
 def require_admin(authorization: str = Header(None)) -> str:
-    """FastAPI dependency: allow only admins, returning the acting username."""
+    """FastAPI dependency: allow admins AND the owner (owner = superset of admin),
+    returning the acting username."""
     u = verify_token(_bearer(authorization))
     if not u:
         raise HTTPException(401, "Non authentifié — reconnectez-vous.")
-    if USERS.get(u, {}).get("role") != "admin":
+    if USERS.get(u, {}).get("role") not in ("admin", "owner"):
         raise HTTPException(403, "Action réservée aux administrateurs (compte en lecture seule).")
+    return u
+
+
+def require_owner(authorization: str = Header(None)) -> str:
+    """FastAPI dependency: only the owner account (monitoring/supervision)."""
+    u = verify_token(_bearer(authorization))
+    if not u:
+        raise HTTPException(401, "Non authentifié — reconnectez-vous.")
+    if USERS.get(u, {}).get("role") != "owner":
+        raise HTTPException(403, "Réservé au compte propriétaire (supervision).")
     return u

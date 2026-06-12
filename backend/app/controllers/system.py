@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
-from ..core.security import authenticate, require_admin, require_user
+from ..core.security import authenticate, require_admin, require_user, require_owner
 from ..services.audit import log_action
 from .. import models
 
@@ -75,8 +75,8 @@ def logout(request: Request, db: Session = Depends(get_db), user: str = Depends(
 
 
 @router.get("/api/audit")
-def get_audit(limit: int = 300, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
-    """The activity log — who did what, when. Admin only."""
+def get_audit(limit: int = 300, db: Session = Depends(get_db), _owner: str = Depends(require_owner)):
+    """The activity log — who did what, when. Owner only (private supervision)."""
     rows = (db.query(models.AuditLog)
             .order_by(models.AuditLog.created_at.desc()).limit(min(limit, 1000)).all())
     return [{"time": (r.created_at.isoformat() if r.created_at else None),

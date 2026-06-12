@@ -14,7 +14,8 @@ export default function App() {
   const [auth, setAuth] = useState(() => {
     try { return JSON.parse(localStorage.getItem("bus_auth") || "null"); } catch { return null; }
   });
-  const isAdmin = auth?.role === "admin";
+  const isAdmin = auth?.role === "admin" || auth?.role === "owner";  // can write (admin powers)
+  const isOwner = auth?.role === "owner";                            // can monitor (Journal)
 
   const [mode, setMode] = useState(
     typeof window !== "undefined" && window.innerWidth < 768 ? "entry" : "calendar"
@@ -28,9 +29,10 @@ export default function App() {
   const logout = () => { api.logout().catch(() => {}); localStorage.removeItem("bus_auth"); setAuth(null); };
 
   // tabs allowed per role. Viewer sees Calendrier + Contrats + Params (all read-only);
-  // Saisie (data entry) and Journal (audit log) stay admin-only.
+  // admins also get Saisie; the Journal (private monitoring) is OWNER-only.
   const tabs = isAdmin
-    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"], ["journal", "🧾 Journal"]]
+    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"],
+       ...(isOwner ? [["journal", "🧾 Journal"]] : [])]
     : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["settings", "⚙️ Params"]];
 
   // if a viewer somehow has an admin-only mode selected, fall back to calendar
