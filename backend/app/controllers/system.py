@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
-from ..core.security import authenticate, require_admin
+from ..core.security import authenticate, require_admin, require_user
 from ..services.audit import log_action
 from .. import models
 
@@ -55,7 +55,23 @@ def login(body: LoginBody, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(401, "Identifiants incorrects.")
 
     _FAILS.pop(ip, None)  # clear on success
+    try:
+        log_action(db, body.username, "Connexion", f"connecté ({info['role']}) — IP {ip}")
+        db.commit()
+    except Exception:
+        db.rollback()
     return {"ok": True, **info}
+
+
+@router.post("/api/logout")
+def logout(request: Request, db: Session = Depends(get_db), user: str = Depends(require_user)):
+    """Records a logout in the Journal (best-effort)."""
+    try:
+        log_action(db, user, "Déconnexion", f"déconnecté — IP {_client_ip(request)}")
+        db.commit()
+    except Exception:
+        db.rollback()
+    return {"ok": True}
 
 
 @router.get("/api/audit")

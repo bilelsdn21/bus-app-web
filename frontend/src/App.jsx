@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { api } from "./api.js";
 import CalendarView from "./components/CalendarView.jsx";
 import DayEntry from "./components/DayEntry.jsx";
 import ContractsView from "./components/ContractsView.jsx";
@@ -24,7 +25,7 @@ export default function App() {
 
   if (!auth) return <Login onLogin={setAuth} />;
 
-  const logout = () => { localStorage.removeItem("bus_auth"); setAuth(null); };
+  const logout = () => { api.logout().catch(() => {}); localStorage.removeItem("bus_auth"); setAuth(null); };
 
   // tabs allowed per role. Viewer sees Calendrier + Contrats + Params (all read-only);
   // Saisie (data entry) and Journal (audit log) stay admin-only.

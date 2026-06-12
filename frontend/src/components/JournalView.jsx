@@ -10,6 +10,9 @@ const CHIP = {
   "Destination": "bg-rose-100 text-rose-700",
   "Périodes":    "bg-slate-200 text-slate-700",
   "Journée":     "bg-sky-100 text-sky-700",
+  "Connexion":         "bg-emerald-100 text-emerald-700",
+  "Déconnexion":       "bg-slate-200 text-slate-600",
+  "Connexion échouée": "bg-rose-100 text-rose-700",
 };
 
 // Emoji by whether the detail is an add / edit / delete.

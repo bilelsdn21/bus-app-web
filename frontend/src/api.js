@@ -32,6 +32,7 @@ async function req(path, opts = {}) {
 
 export const api = {
   login: (username, password) => req(`/api/login`, { method: "POST", body: JSON.stringify({ username, password }) }),
+  logout: () => req(`/api/logout`, { method: "POST" }),
   calendar: (y, m) => req(`/api/calendar/${y}/${m}`),
   buses: () => req(`/api/buses`),
   destinations: () => req(`/api/destinations`),
