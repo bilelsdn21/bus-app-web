@@ -68,8 +68,8 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
-      <div className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4" onClick={onClose}>
+      <div className="flex max-h-[88vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between rounded-t-2xl bg-[#1a3a5c] px-5 py-4 text-white">
           <div>
             <div className="text-sm font-bold">{bus.name}</div>

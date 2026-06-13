@@ -5,7 +5,7 @@
    - API GETs     -> network-first, fall back to the last cached response (view offline)
    POST/PUT/DELETE are never cached — writes always require the network.
 */
-const CACHE = "bus-app-v1";
+const CACHE = "bus-app-v2";
 const CORE = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {

@@ -40,10 +40,12 @@ def _secret() -> str:
 
 
 def _ttl_seconds() -> int:
+    # Long-lived sessions so users stay signed in (still revoked instantly if the
+    # account's password is changed in BUS_USERS). Override with TOKEN_TTL_HOURS.
     try:
-        hours = float(os.environ.get("TOKEN_TTL_HOURS", "336"))  # default 14 days
+        hours = float(os.environ.get("TOKEN_TTL_HOURS", "8760"))  # default 365 days
     except ValueError:
-        hours = 336.0
+        hours = 8760.0
     return int(hours * 3600)
 
 
