@@ -5,6 +5,7 @@ import DayEntry from "./components/DayEntry.jsx";
 import ContractsView from "./components/ContractsView.jsx";
 import SettingsView from "./components/SettingsView.jsx";
 import JournalView from "./components/JournalView.jsx";
+import AnalyticsView from "./components/AnalyticsView.jsx";
 import Login from "./components/Login.jsx";
 import NotifyButton from "./components/NotifyButton.jsx";
 import Logo from "./components/Logo.jsx";
@@ -33,7 +34,7 @@ export default function App() {
   // tabs allowed per role. Viewer sees Calendrier + Contrats + Params (all read-only);
   // admins also get Saisie; the Journal (private monitoring) is OWNER-only.
   const tabs = isAdmin
-    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"],
+    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["analytics", "📈 Analyse"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"],
        ...(isOwner ? [["journal", "🧾 Journal"]] : [])]
     : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["settings", "⚙️ Params"]];
 
@@ -76,6 +77,7 @@ export default function App() {
           <div className="animate-fadein">
             {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} username={auth.username} onOpenContract={openContract} />}
             {effMode === "contracts" && <ContractsView readOnly={!isAdmin} initialBusId={contractBus} />}
+            {effMode === "analytics" && <AnalyticsView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
             {effMode === "entry" && <DayEntry />}
             {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
             {effMode === "journal" && <JournalView />}
