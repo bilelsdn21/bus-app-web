@@ -111,9 +111,14 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
             <div className="space-y-2 rounded-xl bg-sky-50/60 p-3 ring-1 ring-sky-100">
               <div className="text-xs font-bold text-[#1a3a5c]">{form.id ? "Modifier l'excursion" : "Nouvelle excursion"}</div>
               <div className="grid grid-cols-2 gap-2">
-                <L label="Du"><input type="date" className={inp} value={form.start_date} onChange={(ev) => setForm({ ...form, start_date: ev.target.value, end_date: ev.target.value > form.end_date ? ev.target.value : form.end_date })} /></L>
-                <L label="Au (multi-jours)"><input type="date" min={form.start_date} className={inp} value={form.end_date} onChange={(ev) => setForm({ ...form, end_date: ev.target.value })} /></L>
+                <L label="Date"><input type="date" className={inp} value={form.start_date}
+                  onChange={(ev) => { const s = ev.target.value; const n = daysOf(form.start_date, form.end_date); setForm({ ...form, start_date: s, end_date: n > 1 ? addDays(s, n - 1) : s }); }} /></L>
+                <L label="Nombre de jours"><input type="number" min="1" className={inp} value={daysOf(form.start_date, form.end_date)}
+                  onChange={(ev) => { const n = Math.max(1, Number(ev.target.value) || 1); setForm({ ...form, end_date: n > 1 ? addDays(form.start_date, n - 1) : form.start_date }); }} /></L>
               </div>
+              {daysOf(form.start_date, form.end_date) > 1 && (
+                <div className="rounded bg-sky-50 px-2 py-1.5 text-[11px] font-medium text-sky-700">📅 Du {form.start_date} au {form.end_date} — le véhicule est occupé {daysOf(form.start_date, form.end_date)} jours.</div>
+              )}
               <select className={inp} value={form.category} onChange={(ev) => setForm({ ...form, category: ev.target.value, destination: "" })}>
                 <option value="">— Catégorie —</option>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -166,3 +171,5 @@ const Time = ({ value, onChange, ph }) => (
   </select>
 );
 const guessCat = (dests, name) => dests.find((d) => d.name === name)?.category || "";
+const addDays = (iso, n) => { const d = new Date(iso + "T00:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const daysOf = (a, b) => (b && a ? Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000) + 1 : 1);
