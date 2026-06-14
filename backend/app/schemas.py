@@ -126,6 +126,7 @@ class ConfigUpdate(BaseModel):
 class PricePeriodIn(BaseModel):
     dest_name: str
     effective_from: date
+    effective_to: Optional[date] = None
     price_micro: float = 0.0
     price_otokar: float = 0.0
     price_bus: float = 0.0

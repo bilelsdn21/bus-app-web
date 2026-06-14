@@ -26,9 +26,10 @@ def upsert_price_period(body: schemas.PricePeriodIn, db: Session = Depends(get_d
     if not pp:
         pp = models.PricePeriod(dest_name=body.dest_name, effective_from=body.effective_from)
         db.add(pp)
+    pp.effective_to = body.effective_to
     pp.price_micro, pp.price_otokar, pp.price_bus = body.price_micro, body.price_otokar, body.price_bus
     log_action(db, _admin, "Tarif période",
-               f"{body.dest_name} dès {body.effective_from}: MICRO {body.price_micro:.0f}/OTOKAR {body.price_otokar:.0f}/BUS {body.price_bus:.0f}")
+               f"{body.dest_name} {body.effective_from}→{body.effective_to}: MICRO {body.price_micro:.0f}/OTOKAR {body.price_otokar:.0f}/BUS {body.price_bus:.0f}")
     db.commit(); db.refresh(pp)
     return pp
 

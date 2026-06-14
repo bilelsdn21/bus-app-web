@@ -151,27 +151,16 @@ function ConfigPanel({ readOnly = false }) {
   useEffect(() => { api.config().then(setCfg); }, []);
   if (!cfg) return null;
   const save = async () => {
-    await api.setConfig({
-      cut_morn: Number(cfg.cut_morn), cut_night: Number(cfg.cut_night),
-      current_prices_since: cfg.current_prices_since || null,
-    });
+    await api.setConfig({ cut_morn: Number(cfg.cut_morn), cut_night: Number(cfg.cut_night) });
     setMsg("Enregistré.");
     setTimeout(() => setMsg(""), 2000);
   };
   return (
-    <div className="max-w-md space-y-4 rounded-2xl bg-white p-5 shadow ring-1 ring-slate-200">
-      <div>
-        <p className="text-sm text-slate-500">Bornes horaires pour la couleur des excursions (matin / soir / nuit).</p>
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          <L label="Coupure Matin/Soir (h)"><input type="number" disabled={readOnly} className={inp} value={cfg.cut_morn} onChange={(e) => setCfg({ ...cfg, cut_morn: e.target.value })} /></L>
-          <L label="Coupure Soir/Nuit (h)"><input type="number" disabled={readOnly} className={inp} value={cfg.cut_night} onChange={(e) => setCfg({ ...cfg, cut_night: e.target.value })} /></L>
-        </div>
-      </div>
-      <div className="border-t border-slate-100 pt-3">
-        <L label="Prix actuels en vigueur depuis le">
-          <input type="date" disabled={readOnly} className={inp} value={cfg.current_prices_since || ""} onChange={(e) => setCfg({ ...cfg, current_prices_since: e.target.value })} />
-        </L>
-        <p className="mt-1 text-xs text-slate-400">Les excursions <b>avant</b> cette date utilisent les <b>tarifs antérieurs</b> ; à partir de cette date, les prix actuels des destinations. Laissez vide pour appliquer les prix actuels à toutes les dates.</p>
+    <div className="max-w-md space-y-3 rounded-2xl bg-white p-5 shadow ring-1 ring-slate-200">
+      <p className="text-sm text-slate-500">Bornes horaires pour la couleur des excursions (matin / soir / nuit).</p>
+      <div className="grid grid-cols-2 gap-3">
+        <L label="Coupure Matin/Soir (h)"><input type="number" disabled={readOnly} className={inp} value={cfg.cut_morn} onChange={(e) => setCfg({ ...cfg, cut_morn: e.target.value })} /></L>
+        <L label="Coupure Soir/Nuit (h)"><input type="number" disabled={readOnly} className={inp} value={cfg.cut_night} onChange={(e) => setCfg({ ...cfg, cut_night: e.target.value })} /></L>
       </div>
       {!readOnly && <button onClick={save} className={btnPrimary}>Enregistrer</button>}
       {msg && <span className="ml-3 text-sm text-emerald-600">{msg}</span>}
@@ -179,21 +168,36 @@ function ConfigPanel({ readOnly = false }) {
   );
 }
 
+const frDate = (s) => (s ? s.split("-").reverse().join("/") : "—");
+
 function PricePeriodsPanel({ readOnly = false }) {
   const [dests, setDests] = useState([]);
   const [periods, setPeriods] = useState([]);
-  const [eff, setEff] = useState("2025-01-01");
+  const [from, setFrom] = useState("2025-01-01");
+  const [to, setTo] = useState("2025-12-31");
   const [q, setQ] = useState("");
   const [err, setErr] = useState("");
 
   const loadPeriods = () => api.pricePeriods().then(setPeriods).catch((e) => setErr(e.message));
   useEffect(() => { api.destinations().then(setDests).catch(() => {}); loadPeriods(); }, []);
 
+  // distinct saved periods (by date range), for quick re-selection
+  const savedPeriods = useMemo(() => {
+    const m = new Map();
+    periods.forEach((p) => {
+      const k = `${p.effective_from}|${p.effective_to || ""}`;
+      if (!m.has(k)) m.set(k, { from: p.effective_from, to: p.effective_to || "", count: 0 });
+      m.get(k).count++;
+    });
+    return [...m.values()].sort((a, b) => (a.from < b.from ? 1 : -1));
+  }, [periods]);
+
+  // prices already entered for the currently selected range
   const byDest = useMemo(() => {
     const m = {};
-    periods.filter((p) => p.effective_from === eff).forEach((p) => { m[p.dest_name] = p; });
+    periods.filter((p) => p.effective_from === from && (p.effective_to || "") === to).forEach((p) => { m[p.dest_name] = p; });
     return m;
-  }, [periods, eff]);
+  }, [periods, from, to]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -209,7 +213,7 @@ function PricePeriodsPanel({ readOnly = false }) {
         if (existing) await api.deletePricePeriod(existing.id);
       } else {
         await api.setPricePeriod({
-          dest_name: dest.name, effective_from: eff,
+          dest_name: dest.name, effective_from: from, effective_to: to || null,
           price_micro: Number(vals.micro) || 0, price_otokar: Number(vals.otokar) || 0, price_bus: Number(vals.bus) || 0,
         });
       }
@@ -217,29 +221,64 @@ function PricePeriodsPanel({ readOnly = false }) {
     } catch (e) { setErr(e.message); }
   };
 
+  const presetYear = (y) => { setFrom(`${y}-01-01`); setTo(`${y}-12-31`); };
+  const yNow = new Date().getFullYear();
+  const filledCount = Object.keys(byDest).length;
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {err && <Err msg={err} />}
-      <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800 ring-1 ring-amber-100">
-        💡 Saisissez les <b>anciens prix</b> uniquement pour les destinations dont le tarif a changé — les autres gardent automatiquement leur prix actuel. Ces tarifs s'appliquent aux excursions datées <b>à partir de</b> la date choisie ci-dessous (et avant la date « prix actuels » réglée dans l'onglet Périodes).
+
+      {/* Step 1 — choose the period */}
+      <div className="rounded-2xl bg-white p-4 shadow ring-1 ring-slate-200">
+        <div className="text-sm font-bold text-[#1a3a5c]">1️⃣ Choisissez la période</div>
+        <p className="mb-3 text-xs text-slate-400">Les excursions <b>datées dans cette période</b> utiliseront les prix saisis ci-dessous. En dehors, ce sont les prix actuels (onglet Destinations).</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <L label="Du"><input type="date" disabled={readOnly} className={inp} value={from} onChange={(e) => setFrom(e.target.value)} /></L>
+          <L label="Au"><input type="date" disabled={readOnly} className={inp} value={to} onChange={(e) => setTo(e.target.value)} /></L>
+          {!readOnly && (
+            <div className="flex gap-1">
+              {[yNow - 1, yNow - 2].map((y) => (
+                <button key={y} onClick={() => presetYear(y)} className="rounded-lg bg-amber-100 px-2.5 py-2 text-xs font-bold text-amber-700 hover:bg-amber-200">Année {y}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        {savedPeriods.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-slate-400">Périodes enregistrées :</span>
+            {savedPeriods.map((p) => {
+              const on = p.from === from && p.to === to;
+              return <button key={p.from + p.to} onClick={() => { setFrom(p.from); setTo(p.to); }}
+                className={`rounded-lg px-2 py-1 font-semibold ${on ? "bg-[#1a3a5c] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                {frDate(p.from)} → {frDate(p.to)} ({p.count})</button>;
+            })}
+          </div>
+        )}
       </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <L label="Tarifs valables à partir du"><input type="date" disabled={readOnly} className={inp} value={eff} onChange={(e) => setEff(e.target.value)} /></L>
-        <input placeholder="🔎 Rechercher une destination…" value={q} onChange={(e) => setQ(e.target.value)} className={inp + " max-w-xs"} />
-      </div>
-      <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
-        <table className="w-full text-sm">
-          <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
-            <th className="px-3 py-2">Destination</th>
-            <th className="text-right">Actuel (M/O/B)</th>
-            <th className="text-right">MICRO</th><th className="text-right">OTOKAR</th><th className="text-right pr-3">BUS</th>
-          </tr></thead>
-          <tbody>
-            {filtered.map((d) => (
-              <PriceRow key={d.id} dest={d} period={byDest[d.name]} readOnly={readOnly} onSave={saveRow} />
-            ))}
-          </tbody>
-        </table>
+
+      {/* Step 2 — enter the prices */}
+      <div className="rounded-2xl bg-white p-4 shadow ring-1 ring-slate-200">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-bold text-[#1a3a5c]">2️⃣ Saisissez les anciens prix</div>
+          <span className="text-xs text-slate-400">{filledCount} renseigné(s)</span>
+        </div>
+        <p className="mb-2 text-xs text-slate-400">Remplissez <b>uniquement</b> les destinations dont le prix était différent — les autres gardent leur prix actuel. (Videz les 3 cases pour retirer une destination.)</p>
+        <input placeholder="🔎 Rechercher une destination…" value={q} onChange={(e) => setQ(e.target.value)} className={inp + " mb-2 max-w-xs"} />
+        <div className="overflow-x-auto rounded-xl ring-1 ring-slate-100">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
+              <th className="px-3 py-2">Destination</th>
+              <th className="text-right">Actuel (M/O/B)</th>
+              <th className="text-right">MICRO</th><th className="text-right">OTOKAR</th><th className="text-right pr-3">BUS</th>
+            </tr></thead>
+            <tbody>
+              {filtered.map((d) => (
+                <PriceRow key={d.id} dest={d} period={byDest[d.name]} readOnly={readOnly} onSave={saveRow} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

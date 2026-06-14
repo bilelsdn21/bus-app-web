@@ -27,14 +27,13 @@ def price_for(db: Session, destination: str, bus_type: str, on_date=None) -> flo
     if on_date is None:
         return current
 
-    since = get_config(db).current_prices_since
-    if since is None or on_date >= since:
-        return current
-
+    # a price period whose [from .. to] range contains the trip's date wins;
+    # otherwise the current destination price applies.
     p = (db.query(models.PricePeriod)
          .filter(models.PricePeriod.dest_name == destination,
-                 models.PricePeriod.effective_from <= on_date)
+                 models.PricePeriod.effective_from <= on_date,
+                 (models.PricePeriod.effective_to == None) | (models.PricePeriod.effective_to >= on_date))  # noqa: E711
          .order_by(models.PricePeriod.effective_from.desc()).first())
     if p:
         return {"MICRO": p.price_micro, "OTOKAR": p.price_otokar, "BUS": p.price_bus}.get(bt, 0.0)
-    return current  # destination's price didn't change historically
+    return current  # date is outside every period -> current price

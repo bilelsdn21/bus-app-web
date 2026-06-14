@@ -89,12 +89,14 @@ class Config(Base):
 
 
 class PricePeriod(Base):
-    """A historical price for one destination, effective from a given date.
-    Lets old (negotiated) prices be used automatically when back-filling past trips."""
+    """A destination's price during a date range [effective_from .. effective_to].
+    Excursions dated in that range use this price automatically; outside any range,
+    the current Destination price is used. Lets old (negotiated) prices be back-filled."""
     __tablename__ = "price_periods"
     id             = Column(Integer, primary_key=True)
     dest_name      = Column(String, nullable=False, index=True)
     effective_from = Column(Date, nullable=False)
+    effective_to   = Column(Date, nullable=True)
     price_micro    = Column(Float, default=0.0)
     price_otokar   = Column(Float, default=0.0)
     price_bus      = Column(Float, default=0.0)
