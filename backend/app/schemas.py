@@ -114,10 +114,25 @@ class ConfigOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     cut_morn: int = 13
     cut_night: int = 22
+    current_prices_since: Optional[date] = None
 
 class ConfigUpdate(BaseModel):
     cut_morn: int
     cut_night: int
+    current_prices_since: Optional[date] = None
+
+
+# ---- Price periods (historical prices per destination) ----
+class PricePeriodIn(BaseModel):
+    dest_name: str
+    effective_from: date
+    price_micro: float = 0.0
+    price_otokar: float = 0.0
+    price_bus: float = 0.0
+
+class PricePeriodOut(PricePeriodIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
 
 
 # ---- Day save (mobile entry: one bus + date, several activity rows) ----

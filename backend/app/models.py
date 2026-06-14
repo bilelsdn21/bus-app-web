@@ -83,6 +83,22 @@ class Config(Base):
     id         = Column(Integer, primary_key=True)
     cut_morn   = Column(Integer, default=13)   # morning/evening boundary (h)
     cut_night  = Column(Integer, default=22)   # evening/night boundary (h)
+    # current destination prices apply from this date onward; before it, the
+    # historical price periods are used. NULL => current prices for all dates.
+    current_prices_since = Column(Date, nullable=True)
+
+
+class PricePeriod(Base):
+    """A historical price for one destination, effective from a given date.
+    Lets old (negotiated) prices be used automatically when back-filling past trips."""
+    __tablename__ = "price_periods"
+    id             = Column(Integer, primary_key=True)
+    dest_name      = Column(String, nullable=False, index=True)
+    effective_from = Column(Date, nullable=False)
+    price_micro    = Column(Float, default=0.0)
+    price_otokar   = Column(Float, default=0.0)
+    price_bus      = Column(Float, default=0.0)
+    __table_args__ = (UniqueConstraint("dest_name", "effective_from", name="uq_price_period"),)
 
 
 class AuditLog(Base):

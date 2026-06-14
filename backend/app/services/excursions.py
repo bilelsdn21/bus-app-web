@@ -76,7 +76,7 @@ def apply_excursion(db: Session, b: models.Booking, body: schemas.ExcursionIn):
         b.type = "Unavailable"; b.destination = cat
         b.unit_price = 0; b.total = 0
     else:
-        price = price_for(db, dest, bus.type)
+        price = price_for(db, dest, bus.type, start)   # price in effect on the trip's date
         b.type = "Booking"; b.destination = dest
         b.unit_price = price
         b.total = body.total if body.total is not None else price

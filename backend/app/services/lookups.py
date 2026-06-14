@@ -12,10 +12,29 @@ def get_config(db: Session) -> models.Config:
     return cfg
 
 
-def price_for(db: Session, destination: str, bus_type: str) -> float:
-    """Unit price for a destination given the bus type (MICRO/OTOKAR/BUS)."""
+def price_for(db: Session, destination: str, bus_type: str, on_date=None) -> float:
+    """Unit price for a destination given the bus type (MICRO/OTOKAR/BUS).
+
+    If `on_date` is given, the price IN EFFECT on that date is used: the current
+    destination price for dates >= Config.current_prices_since, otherwise the most
+    recent historical PricePeriod (<= on_date) for that destination — falling back
+    to the current price if the destination had no different historical price."""
+    bt = (bus_type or "").upper()
     d = db.query(models.Destination).filter(models.Destination.name == destination).first()
     if not d:
         return 0.0
-    return {"MICRO": d.price_micro, "OTOKAR": d.price_otokar, "BUS": d.price_bus}.get(
-        (bus_type or "").upper(), 0.0)
+    current = {"MICRO": d.price_micro, "OTOKAR": d.price_otokar, "BUS": d.price_bus}.get(bt, 0.0)
+    if on_date is None:
+        return current
+
+    since = get_config(db).current_prices_since
+    if since is None or on_date >= since:
+        return current
+
+    p = (db.query(models.PricePeriod)
+         .filter(models.PricePeriod.dest_name == destination,
+                 models.PricePeriod.effective_from <= on_date)
+         .order_by(models.PricePeriod.effective_from.desc()).first())
+    if p:
+        return {"MICRO": p.price_micro, "OTOKAR": p.price_otokar, "BUS": p.price_bus}.get(bt, 0.0)
+    return current  # destination's price didn't change historically

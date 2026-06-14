@@ -29,6 +29,8 @@ Base.metadata.create_all(engine)
 if engine.dialect.name == "postgresql":
     try:
         with engine.begin() as _conn:
+            # lightweight migration: add the column to the pre-existing config table
+            _conn.execute(text('ALTER TABLE config ADD COLUMN IF NOT EXISTS current_prices_since DATE'))
             for _t in Base.metadata.tables:
                 _conn.execute(text(f'ALTER TABLE public."{_t}" ENABLE ROW LEVEL SECURITY'))
     except Exception:

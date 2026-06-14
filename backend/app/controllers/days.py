@@ -83,7 +83,7 @@ def save_day(body: schemas.DaySave, db: Session = Depends(get_db), _admin: str =
                 heure_debut=row.heure_debut, heure_fin=row.heure_fin,
             ))
         else:
-            price = price_for(db, dest, bus.type)
+            price = price_for(db, dest, bus.type, body.date)   # price in effect on that date
             db.add(models.Booking(
                 date=body.date, bus_id=bus.id, type="Booking",
                 destination=dest, client=row.client, pax=row.pax,
