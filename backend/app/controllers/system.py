@@ -74,10 +74,25 @@ def logout(request: Request, db: Session = Depends(get_db), user: str = Depends(
     return {"ok": True}
 
 
+# Connection events (logins/logouts) are private to the owner; admins don't see them.
+_CONNECTION_ACTIONS = ("Connexion", "Déconnexion", "Connexion échouée")
+
+
 @router.get("/api/audit")
 def get_audit(limit: int = 300, db: Session = Depends(get_db), _owner: str = Depends(require_owner)):
-    """The activity log — who did what, when. Owner only (private supervision)."""
+    """The full activity log — who did what, when, INCLUDING logins/logouts. Owner only."""
     rows = (db.query(models.AuditLog)
+            .order_by(models.AuditLog.created_at.desc()).limit(min(limit, 1000)).all())
+    return [{"time": (r.created_at.isoformat() if r.created_at else None),
+             "user": r.username, "action": r.method, "detail": r.detail or ""}
+            for r in rows]
+
+
+@router.get("/api/audit/changes")
+def get_audit_changes(limit: int = 300, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    """Changes-only log (add/edit/delete) for admins — excludes logins/logouts."""
+    rows = (db.query(models.AuditLog)
+            .filter(~models.AuditLog.method.in_(_CONNECTION_ACTIONS))
             .order_by(models.AuditLog.created_at.desc()).limit(min(limit, 1000)).all())
     return [{"time": (r.created_at.isoformat() if r.created_at else None),
              "user": r.username, "action": r.method, "detail": r.detail or ""}

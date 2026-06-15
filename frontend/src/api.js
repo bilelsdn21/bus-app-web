@@ -69,6 +69,7 @@ export const api = {
   deletePricePeriod: (id) => req(`/api/price-periods/${id}`, { method: "DELETE" }),
 
   audit: () => req(`/api/audit`),
+  auditChanges: () => req(`/api/audit/changes`),
 
   pushKey: () => req(`/api/push/key`),
   pushSubscribe: (sub) => req(`/api/push/subscribe`, { method: "POST", body: JSON.stringify(sub) }),

@@ -23,12 +23,13 @@ function icon(detail = "") {
   return "•";
 }
 
-export default function JournalView() {
+// `full` (owner) shows everything incl. logins/logouts; otherwise (admin) only data changes.
+export default function JournalView({ full = false }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
 
-  const load = () => api.audit().then(setRows).catch((e) => setErr(e.message));
-  useEffect(() => { load(); }, []);
+  const load = () => (full ? api.audit() : api.auditChanges()).then(setRows).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, [full]);
 
   return (
     <div className="space-y-4">
@@ -36,7 +37,11 @@ export default function JournalView() {
         <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">🧾 Journal d'activité</h1>
         <button onClick={load} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold shadow hover:bg-slate-50">↻ Actualiser</button>
       </div>
-      <p className="text-xs text-slate-400">Qui a fait quoi, et quand — avec le détail exact de chaque ajout, modification ou suppression, et le compte responsable.</p>
+      <p className="text-xs text-slate-400">
+        {full
+          ? "Qui a fait quoi, et quand — avec le détail exact de chaque ajout, modification ou suppression, ainsi que les connexions et déconnexions."
+          : "Qui a ajouté, modifié ou supprimé une donnée, et quand — avec le détail exact et le compte responsable."}
+      </p>
 
       {err && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{err}</div>}
       {rows === null && <div className="py-10 text-center text-slate-400">Chargement…</div>}

@@ -42,10 +42,11 @@ export default function App() {
   const openContract = (busId) => { setContractBus(busId); setMode("contracts"); };
 
   // tabs allowed per role. Viewer sees Calendrier + Contrats + Params (all read-only);
-  // admins also get Saisie; the Journal (private monitoring) is OWNER-only.
+  // admins also get Saisie + a Journal of data changes; the OWNER's Journal additionally
+  // shows logins/logouts (private monitoring).
   const tabs = isAdmin
     ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["analytics", "📈 Analyse"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"],
-       ...(isOwner ? [["journal", "🧾 Journal"]] : [])]
+       ["journal", "🧾 Journal"]]
     : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["settings", "⚙️ Params"]];
 
   // if a viewer somehow has an admin-only mode selected, fall back to calendar
@@ -90,7 +91,7 @@ export default function App() {
             {effMode === "analytics" && <AnalyticsView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
             {effMode === "entry" && <DayEntry />}
             {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
-            {effMode === "journal" && <JournalView />}
+            {effMode === "journal" && <JournalView full={isOwner} />}
           </div>
         </ErrorBoundary>
       </main>
