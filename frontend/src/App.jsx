@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "./api.js";
 import CalendarView from "./components/CalendarView.jsx";
 import DayEntry from "./components/DayEntry.jsx";
@@ -18,13 +18,23 @@ export default function App() {
   const isAdmin = auth?.role === "admin" || auth?.role === "owner";  // can write (admin powers)
   const isOwner = auth?.role === "owner";                            // can monitor (Journal)
 
-  const [mode, setMode] = useState(
-    typeof window !== "undefined" && window.innerWidth < 768 ? "entry" : "calendar"
-  );
+  const [mode, setMode] = useState(() => {
+    if (typeof window === "undefined") return "calendar";
+    const tab = new URLSearchParams(window.location.search).get("tab"); // deep-link from a notification
+    if (tab) return tab;
+    return window.innerWidth < 768 ? "entry" : "calendar";
+  });
   const [now] = useState(() => new Date());
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [contractBus, setContractBus] = useState(null); // bus to pre-open in Contrats
+
+  // drop the ?tab= query after using it so a manual refresh doesn't keep forcing the tab
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   if (!auth) return <Login onLogin={setAuth} />;
 

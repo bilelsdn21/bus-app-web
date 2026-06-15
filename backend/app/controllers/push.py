@@ -60,3 +60,15 @@ def notify_test(db: Session = Depends(get_db), _admin: str = Depends(require_adm
     """Admin-only: send the month summary right now to verify it works."""
     title, body = push_svc.build_month_summary(db)
     return push_svc.send_to_all(db, title, body, url="/")
+
+
+class AnnounceIn(BaseModel):
+    title: str
+    body: str
+    url: str = "/"
+
+
+@router.post("/api/notify/announce")
+def notify_announce(body: AnnounceIn, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    """Admin-only: send a custom announcement to everyone. `url` deep-links the app (e.g. /?tab=analytics)."""
+    return push_svc.send_to_all(db, body.title, body.body, url=body.url)

@@ -5,7 +5,7 @@
    - API GETs     -> network-first, fall back to the last cached response (view offline)
    POST/PUT/DELETE are never cached — writes always require the network.
 */
-const CACHE = "bus-app-v2";
+const CACHE = "bus-app-v3";
 const CORE = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
@@ -34,13 +34,18 @@ self.addEventListener("push", (e) => {
   );
 });
 
-// Focus the app (or open it) when the notification is tapped
+// Open the app at the notification's target tab (navigate an already-open window there)
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   const url = (e.notification.data && e.notification.data.url) || "/";
   e.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
-      for (const w of wins) { if ("focus" in w) return w.focus(); }
+      for (const w of wins) {
+        if ("focus" in w) {
+          if ("navigate" in w) { try { w.navigate(url).catch(() => {}); } catch {} }
+          return w.focus();
+        }
+      }
       return self.clients.openWindow(url);
     })
   );
