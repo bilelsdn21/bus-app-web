@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "./api.js";
 import CalendarView from "./components/CalendarView.jsx";
-import DayEntry from "./components/DayEntry.jsx";
 import ContractsView from "./components/ContractsView.jsx";
 import SettingsView from "./components/SettingsView.jsx";
 import JournalView from "./components/JournalView.jsx";
@@ -22,7 +21,7 @@ export default function App() {
     if (typeof window === "undefined") return "calendar";
     const tab = new URLSearchParams(window.location.search).get("tab"); // deep-link from a notification
     if (tab) return tab;
-    return window.innerWidth < 768 ? "entry" : "calendar";
+    return "calendar";
   });
   const [now] = useState(() => new Date());
   const [year, setYear] = useState(now.getFullYear());
@@ -42,10 +41,10 @@ export default function App() {
   const openContract = (busId) => { setContractBus(busId); setMode("contracts"); };
 
   // tabs allowed per role. Viewer sees Calendrier + Contrats + Params (all read-only);
-  // admins also get Saisie + a Journal of data changes; the OWNER's Journal additionally
-  // shows logins/logouts (private monitoring).
+  // admins also get a Journal of data changes; the OWNER's Journal additionally
+  // shows logins/logouts (private monitoring). Trip entry is done by clicking a calendar day.
   const tabs = isAdmin
-    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["analytics", "📈 Analyse"], ["entry", "✏️ Saisie"], ["settings", "⚙️ Params"],
+    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["analytics", "📈 Analyse"], ["settings", "⚙️ Params"],
        ["journal", "🧾 Journal"]]
     : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["settings", "⚙️ Params"]];
 
@@ -89,7 +88,6 @@ export default function App() {
             {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} username={auth.username} onOpenContract={openContract} />}
             {effMode === "contracts" && <ContractsView readOnly={!isAdmin} initialBusId={contractBus} />}
             {effMode === "analytics" && <AnalyticsView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
-            {effMode === "entry" && <DayEntry />}
             {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
             {effMode === "journal" && <JournalView full={isOwner} />}
           </div>
