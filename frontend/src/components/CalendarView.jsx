@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, downloadBlob } from "../api.js";
 import { DOT, fmtTND } from "../colors.js";
 import ExcursionEditor from "./ExcursionEditor.jsx";
 import { useAutoRefresh } from "../useAutoRefresh.js";
@@ -36,6 +36,16 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
   const prev = () => { if (month === 1) { setMonth(12); setYear(year - 1); } else setMonth(month - 1); };
   const next = () => { if (month === 12) { setMonth(1); setYear(year + 1); } else setMonth(month + 1); };
 
+  const [exporting, setExporting] = useState(false);
+  const exportExcel = async () => {
+    setExporting(true); setError("");
+    try {
+      const blob = await api.exportCalendar(year, month);
+      downloadBlob(blob, `Calendrier_${MONTHS_FR[month - 1]}_${year}.xlsx`);
+    } catch (e) { setError(e.message); }
+    finally { setExporting(false); }
+  };
+
   const openDay = (bus, day) => {
     const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     setEditor({ bus, iso });
@@ -63,19 +73,25 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <button onClick={prev} title="Mois précédent" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">←</button>
-        <div className="flex items-center gap-1.5">
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}
-            className="cursor-pointer rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-bold text-[#1a3a5c] shadow-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 sm:text-base">
-            {MONTHS_FR.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-          </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))}
-            className="cursor-pointer rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-bold text-[#1a3a5c] shadow-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 sm:text-base">
-            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button onClick={prev} title="Mois précédent" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">←</button>
+          <div className="flex items-center gap-1.5">
+            <select value={month} onChange={(e) => setMonth(Number(e.target.value))}
+              className="cursor-pointer rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-bold text-[#1a3a5c] shadow-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 sm:text-base">
+              {MONTHS_FR.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+            </select>
+            <select value={year} onChange={(e) => setYear(Number(e.target.value))}
+              className="cursor-pointer rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-bold text-[#1a3a5c] shadow-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 sm:text-base">
+              {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <button onClick={next} title="Mois suivant" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">→</button>
         </div>
-        <button onClick={next} title="Mois suivant" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">→</button>
+        <button onClick={exportExcel} disabled={exporting || !data}
+          className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+          {exporting ? "Export…" : "⬇️ Exporter Excel"}
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-600">
@@ -196,7 +212,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
               <div className="text-xs font-bold uppercase tracking-wider text-amber-700">
                 🚐 Location de véhicules supplémentaires
               </div>
-              <p className="mt-0.5 text-[11px] text-amber-600">Déjà déduit du Net ci-dessus (véhicules loués en renfort, hors flotte).</p>
+              <p className="mt-0.5 text-[11px] text-amber-600">Pour information — n'affecte pas le Net ci-dessus (véhicules loués en renfort, hors flotte, voir l'onglet Loués).</p>
               <div className="mt-3 flex flex-wrap gap-4">
                 {data.summary.rentals.by_region.map((r) => (
                   <div key={r.region}>

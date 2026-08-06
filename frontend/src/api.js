@@ -6,6 +6,25 @@ function authToken() {
   catch { return ""; }
 }
 
+async function reqBlob(path) {
+  const token = authToken();
+  const res = await fetch(BASE + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    let msg = `Erreur ${res.status}`;
+    try { msg = (await res.json()).detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res.blob();
+}
+
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function req(path, opts = {}) {
   const token = authToken();
   const res = await fetch(BASE + path, {
@@ -76,6 +95,9 @@ export const api = {
   createRentedVehicle: (p) => req(`/api/rented-vehicles`, { method: "POST", body: JSON.stringify(p) }),
   updateRentedVehicle: (id, p) => req(`/api/rented-vehicles/${id}`, { method: "PUT", body: JSON.stringify(p) }),
   deleteRentedVehicle: (id) => req(`/api/rented-vehicles/${id}`, { method: "DELETE" }),
+
+  exportCalendar: (y, m) => reqBlob(`/api/export/calendar/${y}/${m}`),
+  exportRentedVehicles: () => reqBlob(`/api/export/rented-vehicles`),
 
   analytics: (y, m) => req(`/api/analytics/${y}/${m}`),
 

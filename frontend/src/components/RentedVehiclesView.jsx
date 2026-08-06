@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, downloadBlob } from "../api.js";
 import { fmtTND } from "../colors.js";
 
 const REGIONS = ["Sousse", "Djerba"];
@@ -9,9 +9,19 @@ export default function RentedVehiclesView({ readOnly = false }) {
   const [rows, setRows] = useState([]);
   const [form, setForm] = useState(null); // {id?, name, region, start_date, end_date, cost, notes}
   const [err, setErr] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const load = () => api.rentedVehicles().then(setRows).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
+
+  const exportExcel = async () => {
+    setExporting(true); setErr("");
+    try {
+      const blob = await api.exportRentedVehicles();
+      downloadBlob(blob, "Vehicules_loues.xlsx");
+    } catch (e) { setErr(e.message); }
+    finally { setExporting(false); }
+  };
 
   const save = async () => {
     setErr("");
@@ -43,6 +53,10 @@ export default function RentedVehiclesView({ readOnly = false }) {
             + Véhicule loué
           </button>
         )}
+        <button onClick={exportExcel} disabled={exporting || rows.length === 0}
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+          {exporting ? "Export…" : "⬇️ Exporter Excel"}
+        </button>
       </div>
 
       <p className="text-xs text-slate-400">

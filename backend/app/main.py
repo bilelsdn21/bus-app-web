@@ -18,7 +18,7 @@ from .core.config import cors_origins
 from . import models  # noqa: F401  (import so tables register before create_all)
 from .controllers import (
     system, buses, destinations, config, contracts, fuel, calendar, excursions, days, push,
-    analytics, rentals,
+    analytics, rentals, export,
 )
 
 Base.metadata.create_all(engine)
@@ -65,6 +65,6 @@ app.add_middleware(
 for router in (
     system.router, buses.router, destinations.router, config.router,
     contracts.router, fuel.router, calendar.router, excursions.router, days.router,
-    push.router, analytics.router, rentals.router,
+    push.router, analytics.router, rentals.router, export.router,
 ):
     app.include_router(router)
