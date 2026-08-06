@@ -99,6 +99,11 @@ export const api = {
   exportCalendar: (y, m) => reqBlob(`/api/export/calendar/${y}/${m}`),
   exportRentedVehicles: () => reqBlob(`/api/export/rented-vehicles`),
 
+  checkAlternatives: ({ type, region, start_date, end_date }) => {
+    const q = new URLSearchParams({ type, region: region || "", start_date, end_date });
+    return req(`/api/rented-vehicles/alternatives?${q}`);
+  },
+
   analytics: (y, m) => req(`/api/analytics/${y}/${m}`),
 
   audit: () => req(`/api/audit`),

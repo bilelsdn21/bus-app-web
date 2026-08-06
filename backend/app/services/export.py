@@ -12,6 +12,7 @@ from .. import models
 from . import calc
 from .calendar import build_calendar
 from .lookups import region_periods_by_bus, region_for
+from .alternatives import check_alternatives
 
 HEADER_FILL = PatternFill("solid", fgColor="1A3A5C")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
@@ -177,22 +178,29 @@ def build_rentals_workbook(db: Session) -> BytesIO:
     ws.title = "Véhicules loués"
     ws.append(["Véhicules loués — export complet"])
     ws["A1"].font = Font(bold=True, size=14, color="1A3A5C")
+    ws.append(["Colonne \"Alternative\" : jours où un véhicule de notre flotte, même type/région, était libre — la location était peut-être évitable ce jour-là."])
     ws.append([])
-    ws.append(["Nom", "Région", "Du", "Au", "Coût (TND)", "Notes"])
+    ws.append(["Nom", "Type", "Région", "Du", "Au", "Coût (TND)", "Alternative (jours)", "Notes"])
     _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
 
     total = 0.0
     for r in rows:
-        ws.append([r.name, r.region or "—", r.start_date.isoformat(), r.end_date.isoformat(),
-                   round(r.cost or 0, 2), r.notes or ""])
-        ws.cell(row=ws.max_row, column=5).number_format = '#,##0.00" TND"'
+        alt = check_alternatives(db, r.type or "MICRO", r.region or "", r.start_date, r.end_date)
+        alt_text = f"{alt['days_with_alternative']}/{alt['days_total']}" if alt["fleet_count"] else "aucun véhicule de ce type"
+        ws.append([r.name, r.type or "—", r.region or "—", r.start_date.isoformat(), r.end_date.isoformat(),
+                   round(r.cost or 0, 2), alt_text, r.notes or ""])
+        row_i = ws.max_row
+        ws.cell(row=row_i, column=6).number_format = '#,##0.00" TND"'
+        if alt["days_with_alternative"] > 0:
+            ws.cell(row=row_i, column=7).fill = PatternFill("solid", fgColor="FEE2E2")
+            ws.cell(row=row_i, column=7).font = Font(color="B91C1C", bold=True)
         total += r.cost or 0
-    ws.append(["TOTAL", "", "", "", round(total, 2), ""])
+    ws.append(["TOTAL", "", "", "", "", round(total, 2), "", ""])
     _style_row(ws, ws.max_row, TOTAL_FILL, TOTAL_FONT)
-    ws.cell(row=ws.max_row, column=5).number_format = '#,##0.00" TND"'
+    ws.cell(row=ws.max_row, column=6).number_format = '#,##0.00" TND"'
 
-    _autosize(ws, [30, 12, 14, 14, 14, 32])
-    ws.freeze_panes = "A4"
+    _autosize(ws, [30, 10, 12, 14, 14, 14, 18, 32])
+    ws.freeze_panes = "A5"
 
     buf = BytesIO()
     wb.save(buf)

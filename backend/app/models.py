@@ -121,11 +121,14 @@ class BusRegionPeriod(Base):
 class RentedVehicle(Base):
     """An external vehicle rented FROM someone else for a period — reinforcement,
     not part of our own fleet (no bus_id). Its cost is prorated by day into whichever
-    calendar month(s) [start_date..end_date] overlaps, and subtracted from that
-    month's region/total Net on the Calendrier page."""
+    calendar month(s) [start_date..end_date] overlaps (shown on the Calendrier page,
+    informational only — see services/rentals.py). `type` (MICRO/OTOKAR/BUS) lets the
+    Loués page flag whether a same-type fleet vehicle was actually free that period —
+    see services/alternatives.py."""
     __tablename__ = "rented_vehicles"
     id         = Column(Integer, primary_key=True)
     name       = Column(String, nullable=False)
+    type       = Column(String, default="MICRO")
     region     = Column(String, default="")
     start_date = Column(Date, nullable=False)
     end_date   = Column(Date, nullable=False)

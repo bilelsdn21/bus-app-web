@@ -151,6 +151,7 @@ class RegionPeriodOut(RegionPeriodIn):
 # ---- Rented vehicles (external reinforcement, not part of our fleet) ----
 class RentedVehicleBase(BaseModel):
     name: str
+    type: str = "MICRO"
     region: str = ""
     start_date: date
     end_date: date

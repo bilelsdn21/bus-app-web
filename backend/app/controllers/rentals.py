@@ -1,4 +1,5 @@
 """Externally rented (reinforcement) vehicle CRUD + monthly cost summary."""
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -7,6 +8,7 @@ from ..core.security import require_admin
 from .. import models, schemas
 from ..services.audit import log_action
 from ..services.rentals import rented_vehicles_summary
+from ..services.alternatives import check_alternatives
 
 router = APIRouter()
 
@@ -52,3 +54,14 @@ def delete_rented_vehicle(rid: int, db: Session = Depends(get_db), _admin: str =
 @router.get("/api/rented-vehicles/summary/{year}/{month}")
 def rented_vehicles_summary_endpoint(year: int, month: int, db: Session = Depends(get_db)):
     return rented_vehicles_summary(db, year, month)
+
+
+@router.get("/api/rented-vehicles/alternatives")
+def alternatives_endpoint(type: str, start_date: date, end_date: date, region: str = "",
+                           db: Session = Depends(get_db)):
+    """Day-by-day: was one of OUR OWN buses of the same type free (under contract, no
+    booking) in that region during the rental period? Lets the manager see whether an
+    external rental was actually necessary."""
+    if end_date < start_date:
+        raise HTTPException(400, "La date de fin doit être après la date de début.")
+    return check_alternatives(db, type, region, start_date, end_date)

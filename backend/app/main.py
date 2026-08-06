@@ -33,6 +33,7 @@ if engine.dialect.name == "postgresql":
             # lightweight migrations: add columns to pre-existing tables
             _conn.execute(text('ALTER TABLE config ADD COLUMN IF NOT EXISTS current_prices_since DATE'))
             _conn.execute(text('ALTER TABLE price_periods ADD COLUMN IF NOT EXISTS effective_to DATE'))
+            _conn.execute(text("ALTER TABLE rented_vehicles ADD COLUMN IF NOT EXISTS type VARCHAR DEFAULT 'MICRO'"))
             for _t in Base.metadata.tables:
                 _conn.execute(text(f'ALTER TABLE public."{_t}" ENABLE ROW LEVEL SECURITY'))
     except Exception:
