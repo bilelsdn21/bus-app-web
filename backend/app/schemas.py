@@ -136,6 +136,18 @@ class PricePeriodOut(PricePeriodIn):
     id: int
 
 
+# ---- Region periods (historical bus->region assignment; buses change region by season) ----
+class RegionPeriodIn(BaseModel):
+    bus_id: int
+    effective_from: date
+    effective_to: Optional[date] = None
+    region: str
+
+class RegionPeriodOut(RegionPeriodIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
 # ---- Day save (mobile entry: one bus + date, several activity rows) ----
 class DayRow(BaseModel):
     category: str = ""

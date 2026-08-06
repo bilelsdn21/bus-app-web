@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from . import calc
-from .lookups import get_config
+from .lookups import get_config, region_periods_by_bus, region_for
 from .contracts import compute_contract_result
 
 
@@ -36,6 +36,8 @@ def build_calendar(db: Session, year: int, month: int) -> dict:
             d = s + timedelta(days=off)
             by_cell.setdefault((b.bus_id, d.isoformat()), []).append(cell)
 
+    periods_by_bus = region_periods_by_bus(db)
+
     # contracts grouped by bus, to pick the one overlapping the viewed month
     contracts = db.query(models.Contract).all()
     contracts_by_bus = {}
@@ -60,7 +62,8 @@ def build_calendar(db: Session, year: int, month: int) -> dict:
             for off in range((e - s).days + 1):
                 covered.add((s + timedelta(days=off)).day)
 
-        bd = {"id": bus.id, "name": bus.name, "type": bus.type, "region": bus.region,
+        region = region_for(bus, start, end, periods_by_bus)
+        bd = {"id": bus.id, "name": bus.name, "type": bus.type, "region": region,
               "distance": bus.distance, "covered_days": sorted(covered)}
         days = {}
         for day in range(1, end.day + 1):
@@ -86,7 +89,7 @@ def build_calendar(db: Session, year: int, month: int) -> dict:
                 "revenue": res["revenue"], "loyer": res["loyer"], "fuel": res["fuel"],
             },
         })
-        sum_rows.append({"region": bus.region or "—", "loyer": res["loyer"], "net": res["net"]})
+        sum_rows.append({"region": region or "—", "loyer": res["loyer"], "net": res["net"]})
         bus_list.append(bd)
 
     # region summary from the contract-aware rows

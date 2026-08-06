@@ -1,4 +1,5 @@
 """Small DB lookups shared across controllers/services."""
+from datetime import date as _date
 from sqlalchemy.orm import Session
 from .. import models
 
@@ -37,3 +38,25 @@ def price_for(db: Session, destination: str, bus_type: str, on_date=None) -> flo
     if p:
         return {"MICRO": p.price_micro, "OTOKAR": p.price_otokar, "BUS": p.price_bus}.get(bt, 0.0)
     return current  # date is outside every period -> current price
+
+
+def region_periods_by_bus(db: Session) -> dict[int, list]:
+    """All BusRegionPeriod rows, grouped by bus_id — load once per request, reuse per bus."""
+    out: dict[int, list] = {}
+    for p in db.query(models.BusRegionPeriod).all():
+        out.setdefault(p.bus_id, []).append(p)
+    return out
+
+
+def region_for(bus, start: _date, end: _date, periods_by_bus: dict[int, list]) -> str:
+    """The bus's region for a calendar month [start..end]: the historical region period
+    overlapping it the most (same "most overlap wins" rule used to pick a contract for
+    the month), or the bus's current `region` field if it has no periods."""
+    best, best_ov = None, 0
+    for p in periods_by_bus.get(bus.id, []):
+        p_end = p.effective_to or _date.max
+        s, e = max(p.effective_from, start), min(p_end, end)
+        ov = (e - s).days + 1 if s <= e else 0
+        if ov > best_ov:
+            best, best_ov = p, ov
+    return best.region if best else (bus.region or "")

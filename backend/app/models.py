@@ -103,6 +103,21 @@ class PricePeriod(Base):
     __table_args__ = (UniqueConstraint("dest_name", "effective_from", name="uq_price_period"),)
 
 
+class BusRegionPeriod(Base):
+    """A bus's region during a date range [effective_from .. effective_to]. Buses move
+    between regions by season; the Calendar/Analyse pages for a given month use whichever
+    period overlaps that month the most, falling back to the bus's current `region` field
+    when no period is defined (fully additive — a bus with no periods behaves as before)."""
+    __tablename__ = "region_periods"
+    id             = Column(Integer, primary_key=True)
+    bus_id         = Column(Integer, ForeignKey("buses.id"), nullable=False, index=True)
+    region         = Column(String, nullable=False)
+    effective_from = Column(Date, nullable=False)
+    effective_to   = Column(Date, nullable=True)
+    bus            = relationship("Bus")
+    __table_args__ = (UniqueConstraint("bus_id", "effective_from", name="uq_region_period"),)
+
+
 class AuditLog(Base):
     """Who did what, when — one row per write action by an admin."""
     __tablename__ = "audit_log"

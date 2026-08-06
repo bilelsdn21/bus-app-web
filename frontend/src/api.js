@@ -68,6 +68,10 @@ export const api = {
   setPricePeriod: (p) => req(`/api/price-periods`, { method: "PUT", body: JSON.stringify(p) }),
   deletePricePeriod: (id) => req(`/api/price-periods/${id}`, { method: "DELETE" }),
 
+  regionPeriods: () => req(`/api/region-periods`),
+  setRegionPeriod: (p) => req(`/api/region-periods`, { method: "PUT", body: JSON.stringify(p) }),
+  deleteRegionPeriod: (id) => req(`/api/region-periods/${id}`, { method: "DELETE" }),
+
   analytics: (y, m) => req(`/api/analytics/${y}/${m}`),
 
   audit: () => req(`/api/audit`),

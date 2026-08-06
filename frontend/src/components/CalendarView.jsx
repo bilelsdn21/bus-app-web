@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api } from "../api.js";
 import { DOT, fmtTND } from "../colors.js";
 import ExcursionEditor from "./ExcursionEditor.jsx";
@@ -131,7 +131,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                   const net = bus.net;
                   const covered = bus.covered_days ? new Set(bus.covered_days) : null;
                   return (
-                    <>
+                    <Fragment key={bus.id}>
                       {sep && (
                         <tr key={`r-${bus.region}`}>
                           <td colSpan={data.days_in_month + 4}
@@ -179,7 +179,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                         <td className={`px-3 py-1.5 text-center font-semibold ${net == null ? "text-slate-300" : net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{bus.pct}</td>
                         <td className="px-3 py-1.5 text-right text-slate-500">{bus.distance > 0 ? `${bus.distance.toLocaleString("fr-FR")} km` : "—"}</td>
                       </tr>
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>

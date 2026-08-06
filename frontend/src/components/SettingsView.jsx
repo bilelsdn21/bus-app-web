@@ -16,11 +16,13 @@ export default function SettingsView({ readOnly = false }) {
         <SubTab on={tab === "buses"} onClick={() => setTab("buses")}>🚌 Véhicules</SubTab>
         <SubTab on={tab === "dests"} onClick={() => setTab("dests")}>📍 Destinations</SubTab>
         <SubTab on={tab === "tarifs"} onClick={() => setTab("tarifs")}>💰 Tarifs antérieurs</SubTab>
+        <SubTab on={tab === "regions"} onClick={() => setTab("regions")}>🗺️ Régions par saison</SubTab>
         <SubTab on={tab === "config"} onClick={() => setTab("config")}>⚙️ Périodes</SubTab>
       </div>
       {tab === "buses" && <BusesPanel readOnly={readOnly} />}
       {tab === "dests" && <DestsPanel readOnly={readOnly} />}
       {tab === "tarifs" && <PricePeriodsPanel readOnly={readOnly} />}
+      {tab === "regions" && <RegionPeriodsPanel readOnly={readOnly} />}
       {tab === "config" && <ConfigPanel readOnly={readOnly} />}
     </div>
   );
@@ -304,6 +306,107 @@ function PriceRow({ dest, period, readOnly, onSave }) {
       <td className="text-right"><input disabled={readOnly} type="number" value={v.otokar} placeholder={dest.price_otokar || "0"} onChange={(e) => setV({ ...v, otokar: e.target.value })} onBlur={commit} className={cell} /></td>
       <td className="py-1.5 pr-3 text-right"><input disabled={readOnly} type="number" value={v.bus} placeholder={dest.price_bus || "0"} onChange={(e) => setV({ ...v, bus: e.target.value })} onBlur={commit} className={cell} /></td>
     </tr>
+  );
+}
+
+function RegionPeriodsPanel({ readOnly = false }) {
+  const [buses, setBuses] = useState([]);
+  const [busId, setBusId] = useState("");
+  const [periods, setPeriods] = useState([]);
+  const [form, setForm] = useState(null); // {id?, effective_from, effective_to, region}
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    api.buses().then((b) => { setBuses(b); if (b[0]) setBusId(String(b[0].id)); }).catch((e) => setErr(e.message));
+  }, []);
+  const loadPeriods = () => api.regionPeriods().then(setPeriods).catch((e) => setErr(e.message));
+  useEffect(() => { loadPeriods(); }, []);
+
+  const bus = buses.find((b) => String(b.id) === busId);
+  const busPeriods = useMemo(
+    () => periods.filter((p) => String(p.bus_id) === busId).sort((a, b) => (a.effective_from < b.effective_from ? 1 : -1)),
+    [periods, busId]
+  );
+
+  const save = async () => {
+    setErr("");
+    try {
+      await api.setRegionPeriod({
+        bus_id: Number(busId), effective_from: form.effective_from,
+        effective_to: form.effective_to || null, region: form.region,
+      });
+      setForm(null); loadPeriods();
+    } catch (e) { setErr(e.message); }
+  };
+  const del = async (p) => {
+    if (!confirm(`Supprimer cette période (${p.region}, dès ${frDate(p.effective_from)}) ?`)) return;
+    try { await api.deleteRegionPeriod(p.id); loadPeriods(); } catch (e) { setErr(e.message); }
+  };
+
+  return (
+    <div className="space-y-4">
+      {err && <Err msg={err} />}
+      <div className="rounded-2xl bg-white p-4 shadow ring-1 ring-slate-200">
+        <p className="mb-3 text-xs text-slate-400">
+          Un véhicule peut changer de région selon la saison. Ajoutez ici ses périodes passées — le Calendrier
+          et l'Analyse d'un mois donné utilisent automatiquement la région en vigueur ce mois-là. Sans période
+          définie, la région actuelle (onglet Véhicules) s'applique à tous les mois — rien ne change pour les
+          véhicules qui n'en ont pas besoin.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <select value={busId} onChange={(e) => setBusId(e.target.value)} className={inp + " max-w-xs"}>
+            {buses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          {!readOnly && (
+            <button onClick={() => setForm({ effective_from: "", effective_to: "", region: bus?.region || REGIONS[0] })} className={btnPrimary}>
+              + Période
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
+            <th className="px-3 py-2">Du</th><th>Au</th><th>Région</th>{!readOnly && <th></th>}
+          </tr></thead>
+          <tbody>
+            {busPeriods.length === 0 && (
+              <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-slate-400">
+                Aucune période — région actuelle appliquée à tous les mois ({bus?.region || "—"}).
+              </td></tr>
+            )}
+            {busPeriods.map((p) => (
+              <tr key={p.id} className="border-t border-slate-100">
+                <td className="px-3 py-2">{frDate(p.effective_from)}</td>
+                <td>{p.effective_to ? frDate(p.effective_to) : "—"}</td>
+                <td className="font-semibold text-slate-700">{p.region}</td>
+                {!readOnly && (
+                  <td className="whitespace-nowrap pr-3 text-right">
+                    <button onClick={() => setForm({ id: p.id, effective_from: p.effective_from, effective_to: p.effective_to || "", region: p.region })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
+                    <button onClick={() => del(p)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {form && (
+        <Modal title={`${form.id ? "Modifier" : "Nouvelle"} période — ${bus?.name || ""}`} onClose={() => setForm(null)} onSave={save} canSave={!!form.effective_from && !!form.region}>
+          <div className="grid grid-cols-2 gap-3">
+            <L label="Du">
+              <input type="date" disabled={!!form.id} className={inp + (form.id ? " bg-slate-50 text-slate-400" : "")}
+                value={form.effective_from} onChange={(e) => setForm({ ...form, effective_from: e.target.value })} />
+            </L>
+            <L label="Au (optionnel)"><input type="date" className={inp} value={form.effective_to} onChange={(e) => setForm({ ...form, effective_to: e.target.value })} /></L>
+          </div>
+          {form.id && <p className="text-xs text-slate-400">La date de début ne peut pas être modifiée — supprimez et recréez la période pour la changer.</p>}
+          <L label="Région"><select className={inp} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>{REGIONS.map((r) => <option key={r}>{r}</option>)}</select></L>
+        </Modal>
+      )}
+    </div>
   );
 }
 

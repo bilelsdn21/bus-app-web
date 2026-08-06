@@ -49,3 +49,37 @@ def delete_bus(bus_id: int, db: Session = Depends(get_db), _admin: str = Depends
     db.delete(bus)
     log_action(db, _admin, "Véhicule", f"Suppression : {name}")
     db.commit()
+
+
+# ---------- historical region periods (a bus changes region by season) ----------
+@router.get("/api/region-periods", response_model=list[schemas.RegionPeriodOut])
+def list_region_periods(db: Session = Depends(get_db)):
+    return (db.query(models.BusRegionPeriod)
+            .order_by(models.BusRegionPeriod.bus_id, models.BusRegionPeriod.effective_from.desc()).all())
+
+
+@router.put("/api/region-periods", response_model=schemas.RegionPeriodOut)
+def upsert_region_period(body: schemas.RegionPeriodIn, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    """Set a bus's region effective from a date (creates or updates)."""
+    rp = (db.query(models.BusRegionPeriod)
+          .filter(models.BusRegionPeriod.bus_id == body.bus_id,
+                  models.BusRegionPeriod.effective_from == body.effective_from).first())
+    if not rp:
+        rp = models.BusRegionPeriod(bus_id=body.bus_id, effective_from=body.effective_from)
+        db.add(rp)
+    rp.effective_to = body.effective_to
+    rp.region = body.region
+    bus = db.get(models.Bus, body.bus_id)
+    log_action(db, _admin, "Région période",
+               f"{bus.name if bus else body.bus_id} {body.effective_from}→{body.effective_to}: {body.region}")
+    db.commit(); db.refresh(rp)
+    return rp
+
+
+@router.delete("/api/region-periods/{rid}", status_code=204)
+def delete_region_period(rid: int, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    rp = db.get(models.BusRegionPeriod, rid)
+    if rp:
+        bus = db.get(models.Bus, rp.bus_id)
+        log_action(db, _admin, "Région période", f"Suppression : {bus.name if bus else rp.bus_id} dès {rp.effective_from}")
+        db.delete(rp); db.commit()

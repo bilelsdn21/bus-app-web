@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from .. import models
 from . import calc
 from .contracts import compute_contract_result
+from .lookups import region_periods_by_bus, region_for
 
 
 def _overlap_days(a0, a1, b0, b1) -> int:
@@ -46,6 +47,8 @@ def build_analytics(db: Session, year: int, month: int) -> dict:
     contracts_by_bus = {}
     for c in db.query(models.Contract).all():
         contracts_by_bus.setdefault(c.bus_id, []).append(c)
+
+    periods_by_bus = region_periods_by_bus(db)
 
     rows = []
     for bus in db.query(models.Bus).order_by(models.Bus.sort_order).all():
@@ -93,8 +96,9 @@ def build_analytics(db: Session, year: int, month: int) -> dict:
                     missing_time += 1
 
         worked_days = len(worked)
+        region = region_for(bus, start, end, periods_by_bus)
         rows.append({
-            "id": bus.id, "name": bus.name, "type": bus.type, "region": bus.region or "—",
+            "id": bus.id, "name": bus.name, "type": bus.type, "region": region or "—",
             "revenue": revenue, "loyer": loyer, "fuel": res["fuel"], "net": res["net"],
             "is_estimated": res["is_estimated"], "coverage": coverage,
             "trips": len(bks), "covered_days": covered_days, "worked_days": worked_days,
