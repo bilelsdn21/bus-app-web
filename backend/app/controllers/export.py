@@ -7,7 +7,10 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_db
 from ..services import calc
-from ..services.export import build_calendar_workbook, build_rentals_workbook
+from ..services.export import (
+    build_calendar_workbook, build_rentals_workbook,
+    build_price_periods_workbook, build_region_periods_workbook,
+)
 
 router = APIRouter()
 
@@ -29,3 +32,17 @@ def export_rented_vehicles(db: Session = Depends(get_db)):
     buf = build_rentals_workbook(db)
     return StreamingResponse(buf, media_type=XLSX_MEDIA,
                               headers={"Content-Disposition": 'attachment; filename="Vehicules_loues.xlsx"'})
+
+
+@router.get("/api/export/price-periods")
+def export_price_periods(db: Session = Depends(get_db)):
+    buf = build_price_periods_workbook(db)
+    return StreamingResponse(buf, media_type=XLSX_MEDIA,
+                              headers={"Content-Disposition": 'attachment; filename="Tarifs_anterieurs.xlsx"'})
+
+
+@router.get("/api/export/region-periods")
+def export_region_periods(db: Session = Depends(get_db)):
+    buf = build_region_periods_workbook(db)
+    return StreamingResponse(buf, media_type=XLSX_MEDIA,
+                              headers={"Content-Disposition": 'attachment; filename="Regions_par_saison.xlsx"'})

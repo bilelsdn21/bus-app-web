@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../api.js";
+import { api, downloadBlob } from "../api.js";
 
 const TYPES = ["MICRO", "OTOKAR", "BUS"];
 const REGIONS = ["Sousse", "Djerba"];
@@ -179,9 +179,19 @@ function PricePeriodsPanel({ readOnly = false }) {
   const [to, setTo] = useState("2025-12-31");
   const [q, setQ] = useState("");
   const [err, setErr] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const loadPeriods = () => api.pricePeriods().then(setPeriods).catch((e) => setErr(e.message));
   useEffect(() => { api.destinations().then(setDests).catch(() => {}); loadPeriods(); }, []);
+
+  const exportExcel = async () => {
+    setExporting(true); setErr("");
+    try {
+      const blob = await api.exportPricePeriods();
+      downloadBlob(blob, "Tarifs_anterieurs.xlsx");
+    } catch (e) { setErr(e.message); }
+    finally { setExporting(false); }
+  };
 
   // distinct saved periods (by date range), for quick re-selection
   const savedPeriods = useMemo(() => {
@@ -230,6 +240,13 @@ function PricePeriodsPanel({ readOnly = false }) {
   return (
     <div className="space-y-4">
       {err && <Err msg={err} />}
+
+      <div className="flex justify-end">
+        <button onClick={exportExcel} disabled={exporting || periods.length === 0}
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+          {exporting ? "Export…" : "⬇️ Exporter Excel"}
+        </button>
+      </div>
 
       {/* Step 1 — choose the period */}
       <div className="rounded-2xl bg-white p-4 shadow ring-1 ring-slate-200">
@@ -315,12 +332,22 @@ function RegionPeriodsPanel({ readOnly = false }) {
   const [periods, setPeriods] = useState([]);
   const [form, setForm] = useState(null); // {id?, effective_from, effective_to, region}
   const [err, setErr] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     api.buses().then((b) => { setBuses(b); if (b[0]) setBusId(String(b[0].id)); }).catch((e) => setErr(e.message));
   }, []);
   const loadPeriods = () => api.regionPeriods().then(setPeriods).catch((e) => setErr(e.message));
   useEffect(() => { loadPeriods(); }, []);
+
+  const exportExcel = async () => {
+    setExporting(true); setErr("");
+    try {
+      const blob = await api.exportRegionPeriods();
+      downloadBlob(blob, "Regions_par_saison.xlsx");
+    } catch (e) { setErr(e.message); }
+    finally { setExporting(false); }
+  };
 
   const bus = buses.find((b) => String(b.id) === busId);
   const busPeriods = useMemo(
@@ -357,6 +384,10 @@ function RegionPeriodsPanel({ readOnly = false }) {
           <select value={busId} onChange={(e) => setBusId(e.target.value)} className={inp + " max-w-xs"}>
             {buses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
+          <button onClick={exportExcel} disabled={exporting || periods.length === 0}
+            className="ml-auto rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+            {exporting ? "Export…" : "⬇️ Exporter Excel"}
+          </button>
           {!readOnly && (
             <button onClick={() => setForm({ effective_from: "", effective_to: "", region: bus?.region || REGIONS[0] })} className={btnPrimary}>
               + Période

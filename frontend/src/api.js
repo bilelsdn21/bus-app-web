@@ -98,6 +98,8 @@ export const api = {
 
   exportCalendar: (y, m) => reqBlob(`/api/export/calendar/${y}/${m}`),
   exportRentedVehicles: () => reqBlob(`/api/export/rented-vehicles`),
+  exportPricePeriods: () => reqBlob(`/api/export/price-periods`),
+  exportRegionPeriods: () => reqBlob(`/api/export/region-periods`),
 
   checkAlternatives: ({ type, region, start_date, end_date }) => {
     const q = new URLSearchParams({ type, region: region || "", start_date, end_date });

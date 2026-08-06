@@ -206,3 +206,62 @@ def build_rentals_workbook(db: Session) -> BytesIO:
     wb.save(buf)
     buf.seek(0)
     return buf
+
+
+def build_price_periods_workbook(db: Session) -> BytesIO:
+    """Tarifs antérieurs — every historical destination price period on record."""
+    rows = (db.query(models.PricePeriod)
+            .order_by(models.PricePeriod.dest_name, models.PricePeriod.effective_from.desc()).all())
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Tarifs antérieurs"
+    ws.append(["Tarifs antérieurs — export complet"])
+    ws["A1"].font = Font(bold=True, size=14, color="1A3A5C")
+    ws.append([])
+    ws.append(["Destination", "Du", "Au", "Prix MICRO", "Prix OTOKAR", "Prix BUS"])
+    _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
+
+    for p in rows:
+        ws.append([p.dest_name, p.effective_from.isoformat(), p.effective_to.isoformat() if p.effective_to else "—",
+                   p.price_micro or 0, p.price_otokar or 0, p.price_bus or 0])
+        for col in (4, 5, 6):
+            ws.cell(row=ws.max_row, column=col).number_format = '#,##0" TND"'
+    if not rows:
+        ws.append(["Aucune période de tarif enregistrée."])
+
+    _autosize(ws, [28, 14, 14, 13, 13, 13])
+    ws.freeze_panes = "A4"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def build_region_periods_workbook(db: Session) -> BytesIO:
+    """Régions par saison — every historical bus->region assignment on record."""
+    rows = (db.query(models.BusRegionPeriod)
+            .options(joinedload(models.BusRegionPeriod.bus))
+            .order_by(models.BusRegionPeriod.bus_id, models.BusRegionPeriod.effective_from.desc()).all())
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Régions par saison"
+    ws.append(["Régions par saison — export complet"])
+    ws["A1"].font = Font(bold=True, size=14, color="1A3A5C")
+    ws.append([])
+    ws.append(["Véhicule", "Région", "Du", "Au"])
+    _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
+
+    for p in rows:
+        ws.append([p.bus.name if p.bus else f"#{p.bus_id}", p.region,
+                   p.effective_from.isoformat(), p.effective_to.isoformat() if p.effective_to else "—"])
+    if not rows:
+        ws.append(["Aucune période de région enregistrée."])
+
+    _autosize(ws, [30, 14, 14, 14])
+    ws.freeze_panes = "A4"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
