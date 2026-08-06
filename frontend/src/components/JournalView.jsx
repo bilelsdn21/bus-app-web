@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, downloadBlob } from "../api.js";
 
 // Colored chip per action category.
 const CHIP = {
@@ -27,15 +27,31 @@ function icon(detail = "") {
 export default function JournalView({ full = false }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const load = () => (full ? api.audit() : api.auditChanges()).then(setRows).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, [full]);
 
+  const exportExcel = async () => {
+    setExporting(true); setErr("");
+    try {
+      const blob = full ? await api.exportJournalFull() : await api.exportJournal();
+      downloadBlob(blob, full ? "Journal_complet.xlsx" : "Journal.xlsx");
+    } catch (e) { setErr(e.message); }
+    finally { setExporting(false); }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">🧾 Journal d'activité</h1>
-        <button onClick={load} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold shadow hover:bg-slate-50">↻ Actualiser</button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportExcel} disabled={exporting || !rows || rows.length === 0}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+            {exporting ? "Export…" : "⬇️ Exporter Excel"}
+          </button>
+          <button onClick={load} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold shadow hover:bg-slate-50">↻ Actualiser</button>
+        </div>
       </div>
       <p className="text-xs text-slate-400">
         {full

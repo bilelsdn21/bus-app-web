@@ -13,6 +13,8 @@ from . import calc
 from .calendar import build_calendar
 from .lookups import region_periods_by_bus, region_for
 from .alternatives import check_alternatives
+from .contracts import compute_contract_result
+from .analytics import build_analytics
 
 HEADER_FILL = PatternFill("solid", fgColor="1A3A5C")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
@@ -259,6 +261,156 @@ def build_region_periods_workbook(db: Session) -> BytesIO:
         ws.append(["Aucune période de région enregistrée."])
 
     _autosize(ws, [30, 14, 14, 14])
+    ws.freeze_panes = "A4"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def build_buses_workbook(db: Session) -> BytesIO:
+    rows = db.query(models.Bus).order_by(models.Bus.sort_order).all()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Véhicules"
+    ws.append(["Véhicules — export complet"])
+    ws["A1"].font = Font(bold=True, size=14, color="1A3A5C")
+    ws.append([])
+    ws.append(["Nom", "Plaque", "Type", "Région", "Distance (km/mois)"])
+    _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
+    for b in rows:
+        ws.append([b.name, b.plate or "", b.type, b.region or "—", b.distance or 0])
+    if not rows:
+        ws.append(["Aucun véhicule enregistré."])
+    _autosize(ws, [30, 16, 10, 12, 18])
+    ws.freeze_panes = "A4"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def build_destinations_workbook(db: Session) -> BytesIO:
+    rows = db.query(models.Destination).order_by(models.Destination.category, models.Destination.name).all()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Destinations"
+    ws.append(["Destinations — tarifs actuels"])
+    ws["A1"].font = Font(bold=True, size=14, color="1A3A5C")
+    ws.append([])
+    ws.append(["Catégorie", "Destination", "Prix MICRO", "Prix OTOKAR", "Prix BUS"])
+    _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
+    for d in rows:
+        ws.append([d.category or "—", d.name, d.price_micro or 0, d.price_otokar or 0, d.price_bus or 0])
+        for col in (3, 4, 5):
+            ws.cell(row=ws.max_row, column=col).number_format = '#,##0" TND"'
+    if not rows:
+        ws.append(["Aucune destination enregistrée."])
+    _autosize(ws, [18, 30, 13, 13, 13])
+    ws.freeze_panes = "A4"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def build_contracts_workbook(db: Session) -> BytesIO:
+    """Every contract across the whole fleet, with its computed result, + a fuel sheet."""
+    contracts = (db.query(models.Contract)
+                 .options(joinedload(models.Contract.bus))
+                 .order_by(models.Contract.start_date.desc()).all())
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Contrats"
+    ws.append(["Contrats — export complet"])
+    ws["A1"].font = Font(bold=True, size=14, color="1A3A5C")
+    ws.append([])
+    ws.append(["Véhicule", "Label", "Du", "Au", "Jours", "Revenu (TND)", "Loyer (TND)",
+               "Carburant (TND)", "Net (TND)", "%", "Estimé ?"])
+    _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
+    for c in contracts:
+        res = compute_contract_result(db, c)
+        ws.append([c.bus.name if c.bus else f"#{c.bus_id}", c.label or "", c.start_date.isoformat(), c.end_date.isoformat(),
+                   res["days"], res["revenue"], res["loyer"], res["fuel"], res["net"], res["pct"],
+                   "Oui" if res["is_estimated"] else "Non"])
+        for col in (6, 7, 8, 9):
+            ws.cell(row=ws.max_row, column=col).number_format = '#,##0.00" TND"'
+    if not contracts:
+        ws.append(["Aucun contrat enregistré."])
+    _autosize(ws, [26, 16, 13, 13, 8, 13, 12, 13, 13, 9, 10])
+    ws.freeze_panes = "A4"
+
+    ws2 = wb.create_sheet("Carburant")
+    fuels = (db.query(models.FuelMonth)
+             .options(joinedload(models.FuelMonth.bus))
+             .order_by(models.FuelMonth.bus_id, models.FuelMonth.year, models.FuelMonth.month).all())
+    ws2.append(["Véhicule", "Année", "Mois", "Estimé (TND)", "Réel (TND)"])
+    _style_row(ws2, 1, HEADER_FILL, HEADER_FONT)
+    for f in fuels:
+        ws2.append([f.bus.name if f.bus else f"#{f.bus_id}", f.year, f.month,
+                    f.estimated or 0, f.actual if f.actual is not None else "—"])
+    if not fuels:
+        ws2.append(["Aucune donnée carburant."])
+    _autosize(ws2, [26, 10, 8, 15, 15])
+    ws2.freeze_panes = "A2"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def build_analytics_workbook(db: Session, year: int, month: int) -> BytesIO:
+    data = build_analytics(db, year, month)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Analyse"
+    ws.append([f"Analyse — {data['label']}"])
+    ws["A1"].font = Font(bold=True, size=14, color="1A3A5C")
+    ws.append([])
+    headers = ["Véhicule", "Type", "Région", "Revenu (TND)", "Loyer (TND)", "Carburant (TND)", "Net (TND)",
+               "Couverture loyer (%)", "Sorties", "Jours sous contrat", "Jours travaillés", "Occupation (%)",
+               "Heures actives", "Moy. h/sortie", "Jours multi-jours", "Sorties sans horaire", "Estimé ?"]
+    ws.append(headers)
+    _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
+    for b in data["buses"]:
+        ws.append([
+            b["name"], b["type"], b["region"], b["revenue"], b["loyer"], b["fuel"], b["net"],
+            b["coverage"] if b["coverage"] is not None else "—",
+            b["trips"], b["covered_days"], b["worked_days"], b["day_occ"],
+            b["timed_hours"], b["avg_hours"] if b["avg_hours"] is not None else "—",
+            b["multi_days"], b["missing_time"], "Oui" if b["is_estimated"] else "Non",
+        ])
+        for col in (4, 5, 6, 7):
+            ws.cell(row=ws.max_row, column=col).number_format = '#,##0.00" TND"'
+    if not data["buses"]:
+        ws.append(["Aucune donnée pour ce mois."])
+    _autosize(ws, [26, 8, 10, 13, 12, 13, 12, 12, 9, 10, 10, 11, 11, 11, 10, 10, 9])
+    ws.freeze_panes = "A4"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def build_journal_workbook(rows, title: str) -> BytesIO:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Journal"
+    ws.append([f"{title} — export complet"])
+    ws["A1"].font = Font(bold=True, size=14, color="1A3A5C")
+    ws.append([])
+    ws.append(["Date / heure", "Utilisateur", "Action", "Détail"])
+    _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
+    for r in rows:
+        ws.append([r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "", r.username, r.method, r.detail or ""])
+    if not rows:
+        ws.append(["Aucune activité enregistrée."])
+    _autosize(ws, [18, 14, 18, 70])
     ws.freeze_panes = "A4"
 
     buf = BytesIO()

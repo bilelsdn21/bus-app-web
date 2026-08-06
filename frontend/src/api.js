@@ -100,6 +100,12 @@ export const api = {
   exportRentedVehicles: () => reqBlob(`/api/export/rented-vehicles`),
   exportPricePeriods: () => reqBlob(`/api/export/price-periods`),
   exportRegionPeriods: () => reqBlob(`/api/export/region-periods`),
+  exportBuses: () => reqBlob(`/api/export/buses`),
+  exportDestinations: () => reqBlob(`/api/export/destinations`),
+  exportContracts: () => reqBlob(`/api/export/contracts`),
+  exportAnalytics: (y, m) => reqBlob(`/api/export/analytics/${y}/${m}`),
+  exportJournal: () => reqBlob(`/api/export/journal`),
+  exportJournalFull: () => reqBlob(`/api/export/journal/full`),
 
   checkAlternatives: ({ type, region, start_date, end_date }) => {
     const q = new URLSearchParams({ type, region: region || "", start_date, end_date });

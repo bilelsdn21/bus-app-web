@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../api.js";
+import { api, downloadBlob } from "../api.js";
 import { fmtTND } from "../colors.js";
 import { useAutoRefresh } from "../useAutoRefresh.js";
 
@@ -15,10 +15,18 @@ export default function AnalyticsView({ year, month, setYear, setMonth }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [sort, setSort] = useState("occ"); // occ | cov | net
+  const [exporting, setExporting] = useState(false);
 
   const reload = () => api.analytics(year, month).then((d) => { setData(d); setErr(""); }).catch((e) => setErr(e.message));
   useEffect(() => { setLoading(true); reload().finally(() => setLoading(false)); }, [year, month]);
   useAutoRefresh(reload);
+
+  const exportExcel = async () => {
+    setExporting(true); setErr("");
+    try { downloadBlob(await api.exportAnalytics(year, month), `Analyse_${MONTHS_FR[month - 1]}_${year}.xlsx`); }
+    catch (e) { setErr(e.message); }
+    finally { setExporting(false); }
+  };
 
   const s = useMemo(() => {
     if (!data) return null;
@@ -44,7 +52,7 @@ export default function AnalyticsView({ year, month, setYear, setMonth }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">📈 Analyse</h1>
         <div className="flex items-center gap-1.5">
           <button onClick={prev} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">←</button>
@@ -56,6 +64,10 @@ export default function AnalyticsView({ year, month, setYear, setMonth }) {
           </select>
           <button onClick={next} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">→</button>
         </div>
+        <button onClick={exportExcel} disabled={exporting || !data}
+          className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+          {exporting ? "Export…" : "⬇️ Exporter Excel"}
+        </button>
       </div>
 
       <p className="text-xs text-slate-400">

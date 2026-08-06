@@ -32,8 +32,16 @@ function BusesPanel({ readOnly = false }) {
   const [buses, setBuses] = useState([]);
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
+  const [exporting, setExporting] = useState(false);
   const load = () => api.buses().then(setBuses).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
+
+  const exportExcel = async () => {
+    setExporting(true); setErr("");
+    try { downloadBlob(await api.exportBuses(), "Vehicules.xlsx"); }
+    catch (e) { setErr(e.message); }
+    finally { setExporting(false); }
+  };
 
   const save = async () => {
     setErr("");
@@ -49,7 +57,13 @@ function BusesPanel({ readOnly = false }) {
   return (
     <div className="space-y-3">
       {err && <Err msg={err} />}
-      {!readOnly && <button onClick={() => setForm({ name: "", type: "BUS", region: "Sousse", distance: 0, plate: "" })} className={btnPrimary}>+ Véhicule</button>}
+      <div className="flex flex-wrap items-center gap-3">
+        {!readOnly && <button onClick={() => setForm({ name: "", type: "BUS", region: "Sousse", distance: 0, plate: "" })} className={btnPrimary}>+ Véhicule</button>}
+        <button onClick={exportExcel} disabled={exporting || buses.length === 0}
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+          {exporting ? "Export…" : "⬇️ Exporter Excel"}
+        </button>
+      </div>
       <p className="text-xs text-slate-400">💡 Le loyer se définit par <b>contrat</b> (onglet Contrats), pas sur le véhicule.</p>
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
         <table className="w-full text-sm">
@@ -91,8 +105,17 @@ function DestsPanel({ readOnly = false }) {
   const [dests, setDests] = useState([]);
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
+  const [exporting, setExporting] = useState(false);
   const load = () => api.destinations().then(setDests).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
+
+  const exportExcel = async () => {
+    setExporting(true); setErr("");
+    try { downloadBlob(await api.exportDestinations(), "Destinations.xlsx"); }
+    catch (e) { setErr(e.message); }
+    finally { setExporting(false); }
+  };
+
   const save = async () => {
     setErr("");
     try {
@@ -107,7 +130,13 @@ function DestsPanel({ readOnly = false }) {
   return (
     <div className="space-y-3">
       {err && <Err msg={err} />}
-      {!readOnly && <button onClick={() => setForm({ category: "", name: "", price_micro: 0, price_otokar: 0, price_bus: 0 })} className={btnPrimary}>+ Destination</button>}
+      <div className="flex flex-wrap items-center gap-3">
+        {!readOnly && <button onClick={() => setForm({ category: "", name: "", price_micro: 0, price_otokar: 0, price_bus: 0 })} className={btnPrimary}>+ Destination</button>}
+        <button onClick={exportExcel} disabled={exporting || dests.length === 0}
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+          {exporting ? "Export…" : "⬇️ Exporter Excel"}
+        </button>
+      </div>
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
         <table className="w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">

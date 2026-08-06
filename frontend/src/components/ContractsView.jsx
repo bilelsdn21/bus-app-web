@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../api.js";
+import { api, downloadBlob } from "../api.js";
 import { fmtTND } from "../colors.js";
 import { useAutoRefresh } from "../useAutoRefresh.js";
 
@@ -12,6 +12,14 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
   const [fuel, setFuel] = useState([]);
   const [err, setErr] = useState("");
   const [form, setForm] = useState(null); // contract being added/edited
+  const [exporting, setExporting] = useState(false);
+
+  const exportExcel = async () => {
+    setExporting(true); setErr("");
+    try { downloadBlob(await api.exportContracts(), "Contrats.xlsx"); }
+    catch (e) { setErr(e.message); }
+    finally { setExporting(false); }
+  };
 
   useEffect(() => {
     api.buses().then((b) => {
@@ -82,6 +90,10 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
             + Nouveau contrat
           </button>
         )}
+        <button onClick={exportExcel} disabled={exporting}
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+          {exporting ? "Export…" : "⬇️ Exporter tous les contrats"}
+        </button>
       </div>
 
       {err && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{err}</div>}
