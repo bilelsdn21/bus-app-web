@@ -190,6 +190,27 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
             {data.summary.regions.map((r) => <SummaryCard key={r.region} r={r} />)}
             <SummaryCard r={data.summary.total} grand />
           </div>
+
+          {data.summary.rentals && data.summary.rentals.total > 0 && (
+            <div className="rounded-2xl bg-amber-50 p-4 shadow ring-1 ring-amber-200">
+              <div className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                🚐 Location de véhicules supplémentaires
+              </div>
+              <p className="mt-0.5 text-[11px] text-amber-600">Déjà déduit du Net ci-dessus (véhicules loués en renfort, hors flotte).</p>
+              <div className="mt-3 flex flex-wrap gap-4">
+                {data.summary.rentals.by_region.map((r) => (
+                  <div key={r.region}>
+                    <div className="text-[11px] font-semibold text-amber-600">{r.region}</div>
+                    <div className="text-sm font-bold text-amber-800">− {fmtTND(r.cost)}</div>
+                  </div>
+                ))}
+                <div className="ml-auto text-right">
+                  <div className="text-[11px] font-semibold text-amber-600">Total</div>
+                  <div className="text-sm font-extrabold text-amber-800">− {fmtTND(data.summary.rentals.total)}</div>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

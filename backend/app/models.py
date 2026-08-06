@@ -118,6 +118,21 @@ class BusRegionPeriod(Base):
     __table_args__ = (UniqueConstraint("bus_id", "effective_from", name="uq_region_period"),)
 
 
+class RentedVehicle(Base):
+    """An external vehicle rented FROM someone else for a period — reinforcement,
+    not part of our own fleet (no bus_id). Its cost is prorated by day into whichever
+    calendar month(s) [start_date..end_date] overlaps, and subtracted from that
+    month's region/total Net on the Calendrier page."""
+    __tablename__ = "rented_vehicles"
+    id         = Column(Integer, primary_key=True)
+    name       = Column(String, nullable=False)
+    region     = Column(String, default="")
+    start_date = Column(Date, nullable=False)
+    end_date   = Column(Date, nullable=False)
+    cost       = Column(Float, default=0.0)
+    notes      = Column(String, default="")
+
+
 class AuditLog(Base):
     """Who did what, when — one row per write action by an admin."""
     __tablename__ = "audit_log"

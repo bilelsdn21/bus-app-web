@@ -7,6 +7,7 @@ from .. import models
 from . import calc
 from .lookups import get_config, region_periods_by_bus, region_for
 from .contracts import compute_contract_result
+from .rentals import rented_vehicles_summary
 
 
 def _overlap_days(a0, a1, b0, b1) -> int:
@@ -97,15 +98,26 @@ def build_calendar(db: Session, year: int, month: int) -> dict:
     for r in sum_rows:
         g = reg.setdefault(r["region"], {"region": r["region"], "loyer": 0.0, "net": 0.0, "count": 0})
         g["loyer"] += r["loyer"]; g["net"] += r["net"]; g["count"] += 1
+
+    # externally rented reinforcement vehicles (not part of our fleet): their prorated
+    # cost this month is subtracted from the matching region's Net (and the grand total).
+    # A region can appear here with no fleet buses this month — still add it, so the
+    # cost is never silently dropped from the total.
+    rentals = rented_vehicles_summary(db, year, month)
+    rentals_by_region = {r["region"]: r["cost"] for r in rentals["by_region"]}
+    for region_name in rentals_by_region:
+        reg.setdefault(region_name, {"region": region_name, "loyer": 0.0, "net": 0.0, "count": 0})
+
     regions = list(reg.values())
     for g in regions:
+        g["net"] -= rentals_by_region.get(g["region"], 0.0)
         g["pct"] = calc.pct(g["net"], g["loyer"])
     total = {"region": "TOTAL",
              "loyer": sum(g["loyer"] for g in regions),
              "net": sum(g["net"] for g in regions),
              "count": sum(g["count"] for g in regions)}
     total["pct"] = calc.pct(total["net"], total["loyer"])
-    summary = {"regions": regions, "total": total}
+    summary = {"regions": regions, "total": total, "rentals": rentals}
 
     return {
         "year": year, "month": month,

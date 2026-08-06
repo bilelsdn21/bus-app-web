@@ -148,6 +148,23 @@ class RegionPeriodOut(RegionPeriodIn):
     id: int
 
 
+# ---- Rented vehicles (external reinforcement, not part of our fleet) ----
+class RentedVehicleBase(BaseModel):
+    name: str
+    region: str = ""
+    start_date: date
+    end_date: date
+    cost: float = 0.0
+    notes: str = ""
+
+class RentedVehicleCreate(RentedVehicleBase):
+    pass
+
+class RentedVehicleOut(RentedVehicleBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
 # ---- Day save (mobile entry: one bus + date, several activity rows) ----
 class DayRow(BaseModel):
     category: str = ""

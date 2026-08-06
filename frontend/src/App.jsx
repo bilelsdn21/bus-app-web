@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { api } from "./api.js";
 import CalendarView from "./components/CalendarView.jsx";
 import ContractsView from "./components/ContractsView.jsx";
+import RentedVehiclesView from "./components/RentedVehiclesView.jsx";
 import SettingsView from "./components/SettingsView.jsx";
 import JournalView from "./components/JournalView.jsx";
 import AnalyticsView from "./components/AnalyticsView.jsx";
@@ -44,9 +45,9 @@ export default function App() {
   // admins also get a Journal of data changes; the OWNER's Journal additionally
   // shows logins/logouts (private monitoring). Trip entry is done by clicking a calendar day.
   const tabs = isAdmin
-    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["analytics", "📈 Analyse"], ["settings", "⚙️ Params"],
+    ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["rentals", "🚐 Loués"], ["analytics", "📈 Analyse"], ["settings", "⚙️ Params"],
        ["journal", "🧾 Journal"]]
-    : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["settings", "⚙️ Params"]];
+    : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["rentals", "🚐 Loués"], ["settings", "⚙️ Params"]];
 
   // if a viewer somehow has an admin-only mode selected, fall back to calendar
   const effMode = tabs.some(([k]) => k === mode) ? mode : "calendar";
@@ -87,6 +88,7 @@ export default function App() {
           <div className="animate-fadein">
             {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} username={auth.username} onOpenContract={openContract} />}
             {effMode === "contracts" && <ContractsView readOnly={!isAdmin} initialBusId={contractBus} />}
+            {effMode === "rentals" && <RentedVehiclesView readOnly={!isAdmin} />}
             {effMode === "analytics" && <AnalyticsView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
             {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
             {effMode === "journal" && <JournalView full={isOwner} />}

@@ -187,6 +187,21 @@ def contract_result(contract, bookings, fuel_by_month):
     }
 
 
+def prorate_period_cost(start: date, end: date, cost: float, year: int, month: int) -> float:
+    """Spread a flat cost for a [start..end] period across a calendar month by day
+    overlap (e.g. a reinforcement vehicle rented for a stretch that crosses a month
+    boundary — each month gets its share of the total cost)."""
+    total_days = (end - start).days + 1
+    if total_days <= 0:
+        return 0.0
+    m_start, m_end = month_bounds(year, month)
+    ov_start, ov_end = max(start, m_start), min(end, m_end)
+    if ov_start > ov_end:
+        return 0.0
+    days_overlap = (ov_end - ov_start).days + 1
+    return round(cost * days_overlap / total_days, 2)
+
+
 def region_summary(buses, month_bookings):
     """Totals per region + grand total. Loyer/net always computed from the SAME bus set."""
     regions = {}

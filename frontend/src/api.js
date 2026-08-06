@@ -72,6 +72,11 @@ export const api = {
   setRegionPeriod: (p) => req(`/api/region-periods`, { method: "PUT", body: JSON.stringify(p) }),
   deleteRegionPeriod: (id) => req(`/api/region-periods/${id}`, { method: "DELETE" }),
 
+  rentedVehicles: () => req(`/api/rented-vehicles`),
+  createRentedVehicle: (p) => req(`/api/rented-vehicles`, { method: "POST", body: JSON.stringify(p) }),
+  updateRentedVehicle: (id, p) => req(`/api/rented-vehicles/${id}`, { method: "PUT", body: JSON.stringify(p) }),
+  deleteRentedVehicle: (id) => req(`/api/rented-vehicles/${id}`, { method: "DELETE" }),
+
   analytics: (y, m) => req(`/api/analytics/${y}/${m}`),
 
   audit: () => req(`/api/audit`),
