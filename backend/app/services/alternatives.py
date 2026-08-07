@@ -1,8 +1,11 @@
 """Was renting an external vehicle actually necessary? For a rented vehicle's type,
 region and period, check — day by day — whether one of OUR OWN fleet buses of the
-same type was under an active contract AND had no booking/unavailable mark that day
-(i.e. sitting idle) in the same region. If so, the rental may have been avoidable —
-this is what lets the manager audit the dispatcher's decisions."""
+same type was under an active contract AND had no paid booking or out-of-service mark
+that day (i.e. sitting idle) in the same region. If so, the rental may have been
+avoidable — this is what lets the manager audit the dispatcher's decisions.
+
+A bus explicitly marked "Libre" (one of UNAVAIL_CATS) is NOT busy — that category
+means the dispatcher flagged the bus as free that day, so it counts as available."""
 from datetime import date, timedelta
 from collections import defaultdict
 from sqlalchemy import func
@@ -10,7 +13,11 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from . import calc
+from ..core.config import UNAVAIL_CATS
 from .lookups import region_periods_by_bus, region_for
+
+FREE_MARK = "Libre"
+assert FREE_MARK in UNAVAIL_CATS
 
 
 def check_alternatives(db: Session, vehicle_type: str, region: str, start_date: date, end_date: date) -> dict:
@@ -22,8 +29,9 @@ def check_alternatives(db: Session, vehicle_type: str, region: str, start_date: 
 
     bus_ids = [b.id for b in buses]
 
-    # every booking/unavailable row (either counts as "busy") overlapping the period,
-    # for buses of this type only
+    # every paid booking or out-of-service mark counts as "busy", overlapping the
+    # period, for buses of this type only — EXCEPT rows explicitly marked "Libre",
+    # which mean the bus is free that day
     books = (db.query(models.Booking)
              .filter(models.Booking.bus_id.in_(bus_ids),
                      models.Booking.date <= end_date,
@@ -31,6 +39,8 @@ def check_alternatives(db: Session, vehicle_type: str, region: str, start_date: 
              .all())
     busy = set()  # {(bus_id, date)}
     for b in books:
+        if b.type == "Unavailable" and b.destination == FREE_MARK:
+            continue
         s, e = max(b.date, start_date), min(b.end_date or b.date, end_date)
         for off in range((e - s).days + 1):
             busy.add((b.bus_id, s + timedelta(days=off)))
