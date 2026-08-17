@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
-from ..core.security import require_admin
+from ..core.security import require_admin, require_user
 from ..services.analytics import build_analytics
 
-router = APIRouter()
+# Reads require a signed-in account; writes add require_admin on top.
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/api/analytics/{year}/{month}")

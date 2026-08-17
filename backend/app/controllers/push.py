@@ -22,8 +22,9 @@ class SubIn(BaseModel):
 
 
 @router.get("/api/push/key")
-def push_key():
-    """Public VAPID key the browser needs to subscribe."""
+def push_key(_user: str = Depends(require_user)):
+    """VAPID public key the browser needs to subscribe. Not a secret, but only
+    signed-in accounts ever need it — no reason to hand it to anonymous callers."""
     return {"key": push_svc.VAPID_PUBLIC_KEY}
 
 

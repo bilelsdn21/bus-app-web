@@ -3,12 +3,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
-from ..core.security import require_admin
+from ..core.security import require_admin, require_user
 from .. import schemas
 from ..services.lookups import get_config
 from ..services.audit import log_action
 
-router = APIRouter()
+# Reads require a signed-in account; writes add require_admin on top.
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/api/config", response_model=schemas.ConfigOut)

@@ -5,12 +5,13 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
-from ..core.security import require_admin
+from ..core.security import require_admin, require_user
 from .. import models, schemas
 from ..services.excursions import excursion_out, describe_exc, apply_excursion
 from ..services.audit import log_action
 
-router = APIRouter()
+# Reads require a signed-in account; writes add require_admin on top.
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/api/excursions/day/{bus_id}/{day_iso}")

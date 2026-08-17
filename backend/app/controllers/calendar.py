@@ -3,9 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
+from ..core.security import require_user
 from ..services.calendar import build_calendar
 
-router = APIRouter()
+# Reads require a signed-in account; writes add require_admin on top.
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/api/calendar/{year}/{month}")

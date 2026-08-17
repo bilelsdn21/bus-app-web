@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
-from ..core.security import require_admin
+from ..core.security import require_admin, require_user
 from .. import models, schemas
 from ..services.audit import log_action
 from ..services.rentals import rented_vehicles_summary
 from ..services.alternatives import check_alternatives
 
-router = APIRouter()
+# Reads require a signed-in account; writes add require_admin on top.
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/api/rented-vehicles", response_model=list[schemas.RentedVehicleOut])

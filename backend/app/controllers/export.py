@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
-from ..core.security import require_admin, require_owner
+from ..core.security import require_admin, require_owner, require_user
 from .. import models
 from ..services import calc
 from ..services.export import (
@@ -17,7 +17,9 @@ from ..services.export import (
     build_analytics_workbook, build_journal_workbook,
 )
 
-router = APIRouter()
+# Every export is a full data dump — a signed-in account is the minimum;
+# the analytics/journal exports add require_admin / require_owner on top.
+router = APIRouter(dependencies=[Depends(require_user)])
 
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _CONNECTION_ACTIONS = ("Connexion", "Déconnexion", "Connexion échouée")
