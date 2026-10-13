@@ -10,6 +10,33 @@ The current Excel/Streamlit workflow is untouched — this lives entirely in `bu
 - Bookings reference a bus by **ID (foreign key)** → the name-mismatch bug that lost 1,440 TND **cannot happen**.
 - One calc module (`backend/app/services/calc.py`) = single source of truth for net, %, colors, summary.
 
+## What it calculates
+
+Everything flows through one module, [`backend/app/services/calc.py`](backend/app/services/calc.py):
+
+1. **Monthly net per bus** — `net = Σ(booking totals) − loyer`, plus `% = net / loyer`. The headline profitability number every view builds on.
+
+2. **Contract result with day-prorated fuel** — the hard, valuable part. Contracts have arbitrary start/end dates (e.g. 15 May → 14 June), *not* aligned to calendar months. Fuel is tracked per calendar month (first `estimated`, later `actual`). So fuel can't be added in whole months — each month's fuel is split by the days it overlaps the contract:
+
+   ```
+   fuel = Σ  (month fuel) × (days overlapping contract / days in month)
+   net  = revenue − loyer − fuel
+   ```
+
+   The result is flagged **estimé** until every month it touches has an actual figure.
+
+   *Worked example:* contract 15 May → 14 June, loyer 5000, May fuel (actual) 2000, June fuel (est.) 1200, revenue 12270:
+   ```
+   fuel = 17/31 × 2000 + 14/30 × 1200 = 1096.77 + 560 = 1656.77
+   net  = 12270 − 5000 − 1656.77      = 5613.23  (estimé)
+   ```
+
+3. **Day availability / color** — each day is classified by the time periods its trips touch (morning / evening / night) from each trip's start→end time; green when trips span multiple periods or a multi-day excursion covers the day, red when the bus is unavailable. Replaces Excel's conditional formatting with real logic.
+
+4. **Region & fleet roll-ups** — net and % aggregated per region and across the whole fleet, always from the same bus set so the totals reconcile.
+
+**Why it matters:** the old Excel matched a booking to a bus *by name* — a single name mismatch misattributed revenue and lost 1,440 TND. Here every booking references a bus by **ID (foreign key)**, so that class of error is structurally impossible. The fuel proration (with the estimated→actual transition) is what makes the per-contract profit trustworthy even when contracts straddle month boundaries.
+
 ## Backend architecture (MVC)
 The FastAPI backend (`backend/app/`) is organized as Model–View–Controller:
 
