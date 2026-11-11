@@ -73,13 +73,15 @@ const WAKING = "Le serveur démarre, réessayez dans quelques secondes.";
 class Transient extends Error {}
 
 async function doReq(path, opts, isGet) {
-  const tries = isGet ? 4 : 1;
+  // A sleeping free-tier server needs up to ~60 s to boot and answers with error pages
+  // meanwhile, so reads keep trying for about a minute before giving up.
+  const tries = isGet ? 15 : 1;
   for (let i = 0; i < tries; i++) {
     try { return await attempt(path, opts, isGet); }
     catch (e) {
       if (!(e instanceof Transient)) throw e;
       if (i === tries - 1) throw new Error(WAKING);
-      await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+      await new Promise((r) => setTimeout(r, 4000));
     }
   }
 }
