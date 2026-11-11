@@ -60,16 +60,40 @@ async function req(path, opts = {}) {
   return p;
 }
 
+// A server that is (re)starting answers with an HTML placeholder or a 502/503/504 instead
+// of JSON. Reads are retried a few times (they are safe to repeat); writes never are, so
+// nothing can be saved twice. After that the user gets a readable message, not a parse error.
+const WAKING = "Le serveur démarre, réessayez dans quelques secondes.";
+class Transient extends Error {}
+
 async function doReq(path, opts, isGet) {
+  const tries = isGet ? 4 : 1;
+  for (let i = 0; i < tries; i++) {
+    try { return await attempt(path, opts, isGet); }
+    catch (e) {
+      if (!(e instanceof Transient)) throw e;
+      if (i === tries - 1) throw new Error(WAKING);
+      await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+  }
+}
+
+async function attempt(path, opts, isGet) {
   const token = authToken();
-  const res = await fetch(BASE + path, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(opts.headers || {}),
-    },
-  });
+  let res;
+  try {
+    res = await fetch(BASE + path, {
+      ...opts,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(opts.headers || {}),
+      },
+    });
+  } catch { throw new Transient(); }          // network error / server not reachable yet
+  if ([502, 503, 504].includes(res.status)) throw new Transient();
+  const isJson = (res.headers.get("content-type") || "").includes("json");
+  if (res.ok && res.status !== 204 && !isJson) throw new Transient();   // HTML placeholder page
   if (!res.ok) {
     // Session expired/invalid while we DID send a token -> log out to the login screen.
     if (res.status === 401 && token) {

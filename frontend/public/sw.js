@@ -5,7 +5,7 @@
    - API GETs     -> network-first, fall back to the last cached response (view offline)
    POST/PUT/DELETE are never cached — writes always require the network.
 */
-const CACHE = "bus-app-v3";
+const CACHE = "bus-app-v4";
 const CORE = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
@@ -70,8 +70,13 @@ self.addEventListener("fetch", (e) => {
   if (url.pathname.startsWith("/api/")) {
     e.respondWith(
       fetch(req)
-        .then((res) => { if (res && res.status === 200) caches.open(CACHE).then((c) => c.put(req, res.clone())); return res; })
-        .catch(() => caches.match(req))
+        .then((res) => {
+          // only keep real JSON answers (never an HTML "server waking up" page)
+          const json = res && (res.headers.get("content-type") || "").includes("json");
+          if (res && res.status === 200 && json) caches.open(CACHE).then((c) => c.put(req, res.clone()));
+          return res;
+        })
+        .catch(() => caches.match(req).then((r) => r || Response.error()))
     );
     return;
   }
