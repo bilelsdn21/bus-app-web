@@ -29,7 +29,13 @@ export function downloadBlob(blob, filename) {
 // The last good answer of every GET is kept in memory + localStorage, so a page can
 // paint instantly from it (api.peek) while the fresh answer loads in the background.
 const mem = new Map();
-const LS = "bus_cache:";
+// Saved answers belong to ONE backend and ONE data format: the key includes the API address
+// and a version, so switching backend (or changing the response shape) can never show old data.
+const CACHE_VERSION = 3;
+const LS = `bus_cache:v${CACHE_VERSION}:${BASE}:`;
+try {   // drop anything saved under another backend/version
+  Object.keys(localStorage).filter((k) => k.startsWith("bus_cache:") && !k.startsWith(LS)).forEach((k) => localStorage.removeItem(k));
+} catch {}
 export function peek(path) {
   if (mem.has(path)) return mem.get(path);
   try {
@@ -42,7 +48,7 @@ function remember(path, data) {
   mem.set(path, data);
   try { localStorage.setItem(LS + path, JSON.stringify(data)); }
   catch { // quota: drop old entries, they are only an optimisation
-    try { Object.keys(localStorage).filter((k) => k.startsWith(LS)).forEach((k) => localStorage.removeItem(k)); } catch {}
+    try { Object.keys(localStorage).filter((k) => k.startsWith("bus_cache:")).forEach((k) => localStorage.removeItem(k)); } catch {}
   }
 }
 export function clearCache() {
