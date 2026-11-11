@@ -5,7 +5,7 @@
    - API GETs     -> network-first, fall back to the last cached response (view offline)
    POST/PUT/DELETE are never cached — writes always require the network.
 */
-const CACHE = "bus-app-v4";
+const CACHE = "bus-app-v5";
 const CORE = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (e) => {
@@ -60,7 +60,7 @@ self.addEventListener("fetch", (e) => {
   if (req.mode === "navigate") {
     e.respondWith(
       fetch(req)
-        .then((res) => { caches.open(CACHE).then((c) => c.put("/", res.clone())).catch(() => {}); return res; })
+        .then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put("/", copy)).catch(() => {}); return res; })
         .catch(() => caches.match("/").then((r) => r || caches.match("/index.html")))
     );
     return;
@@ -73,7 +73,10 @@ self.addEventListener("fetch", (e) => {
         .then((res) => {
           // only keep real JSON answers (never an HTML "server waking up" page)
           const json = res && (res.headers.get("content-type") || "").includes("json");
-          if (res && res.status === 200 && json) caches.open(CACHE).then((c) => c.put(req, res.clone()));
+          if (res && res.status === 200 && json) {
+            const copy = res.clone();   // clone NOW: once the page reads the body it is too late
+            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          }
           return res;
         })
         .catch(() => caches.match(req).then((r) => r || Response.error()))
@@ -86,7 +89,13 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       caches.match(req).then((cached) => {
         const net = fetch(req)
-          .then((res) => { if (res && res.status === 200) caches.open(CACHE).then((c) => c.put(req, res.clone())); return res; })
+          .then((res) => {
+            if (res && res.status === 200) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+            }
+            return res;
+          })
           .catch(() => cached);
         return cached || net;
       })
