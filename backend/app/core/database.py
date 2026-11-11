@@ -13,6 +13,13 @@ load_dotenv()
 # to the Supabase Postgres connection string.
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./bus_app.db")
 
+# Name the driver explicitly (we ship psycopg2). Newer SQLAlchemy versions treat a bare
+# "postgresql://" as psycopg v3, which is not installed -> startup crash.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len("postgresql://"):]
+
 # SQLite needs this flag for multi-threaded FastAPI; Postgres ignores it.
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
