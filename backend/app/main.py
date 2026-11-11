@@ -11,6 +11,7 @@ Run:  uvicorn app.main:app --reload --port 8000
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
 
@@ -45,7 +46,17 @@ app = FastAPI(title="Bus Manager API")
 
 @app.middleware("http")
 async def security_headers(request, call_next):
-    resp = await call_next(request)
+    try:
+        resp = await call_next(request)
+    except Exception as e:
+        # Answer unexpected crashes with a readable JSON error from INSIDE the CORS layer.
+        # (Starlette's own 500 page is sent outside it: the browser then sees a network
+        # failure with no message at all, which hides the real cause.)
+        import logging, traceback
+        logging.getLogger("uvicorn.error").error("Unhandled error on %s %s: %s",
+                                                 request.method, request.url.path, traceback.format_exc())
+        first = (str(getattr(e, "orig", e)).strip().splitlines() or [""])[0][:200]
+        resp = JSONResponse({"detail": f"Erreur serveur ({type(e).__name__}) {first}".strip()}, status_code=500)
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "no-referrer"
