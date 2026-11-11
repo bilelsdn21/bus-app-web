@@ -21,10 +21,14 @@ if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len("postgresql://"):]
 
 # SQLite needs this flag for multi-threaded FastAPI; Postgres ignores it.
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+# Postgres: never wait forever for a connection (a stuck pooler used to hang requests until
+# the host cut them off with a 502/504); fail fast with a readable error instead.
+connect_args = ({"check_same_thread": False} if DATABASE_URL.startswith("sqlite")
+                else {"connect_timeout": 10})
 
 _pool = {} if DATABASE_URL.startswith("sqlite") else {
     "pool_size": 5, "max_overflow": 5,
+    "pool_timeout": 15,       # wait at most 15 s for a free pooled connection
     "pool_recycle": 240,      # drop connections before the pooler/firewall silently kills them
 }
 engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True, **_pool)

@@ -18,6 +18,27 @@ def health():
     return {"ok": True}
 
 
+@router.get("/api/health/db")
+def health_db():
+    """Can the server reach its database right now? Reports ok/ms or the error KIND only
+    (no host, user or password)."""
+    import time as _t
+    from sqlalchemy import text
+    from ..core.database import engine
+    t0 = _t.time()
+    try:
+        with engine.connect() as c:
+            c.execute(text("select 1"))
+        return {"db": True, "ms": round((_t.time() - t0) * 1000)}
+    except Exception as e:
+        msg = str(getattr(e, "orig", e)).strip().splitlines()[0][:160] if str(e).strip() else ""
+        for secret in (engine.url.host, engine.url.username, engine.url.password):
+            if secret:
+                msg = msg.replace(str(secret), "***")
+        return {"db": False, "ms": round((_t.time() - t0) * 1000),
+                "error": type(e).__name__, "detail": msg}
+
+
 class LoginBody(BaseModel):
     username: str
     password: str
