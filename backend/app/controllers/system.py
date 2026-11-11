@@ -13,7 +13,7 @@ from .. import models
 router = APIRouter()
 
 
-@router.get("/api/health")
+@router.api_route("/api/health", methods=["GET", "HEAD"])   # uptime monitors usually send HEAD
 def health():
     return {"ok": True}
 
