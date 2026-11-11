@@ -11,14 +11,18 @@ const covTone = (c) => (c == null ? "warn" : c >= 150 ? "good" : c >= 100 ? "war
 const occTone = (o) => (o >= 70 ? "good" : o >= 40 ? "warn" : "bad");
 
 export default function AnalyticsView({ year, month, setYear, setMonth }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(() => api.peek.analytics(year, month));
+  const [loading, setLoading] = useState(() => !api.peek.analytics(year, month));
   const [err, setErr] = useState("");
   const [sort, setSort] = useState("occ"); // occ | cov | net
   const [exporting, setExporting] = useState(false);
 
   const reload = () => api.analytics(year, month).then((d) => { setData(d); setErr(""); }).catch((e) => setErr(e.message));
-  useEffect(() => { setLoading(true); reload().finally(() => setLoading(false)); }, [year, month]);
+  useEffect(() => {
+    const known = api.peek.analytics(year, month);
+    if (known) { setData(known); setLoading(false); } else setLoading(true);
+    reload().finally(() => setLoading(false));
+  }, [year, month]);
   useAutoRefresh(reload);
 
   const exportExcel = async () => {
@@ -30,21 +34,38 @@ export default function AnalyticsView({ year, month, setYear, setMonth }) {
 
   const s = useMemo(() => {
     if (!data) return null;
-    const buses = data.buses;
-    const n = buses.length;
-    const withLoyer = buses.filter((b) => b.coverage != null);
+    const buses = data.buses;   // one entry per region period — a vehicle that moved has two
+
+    // fleet-level counters are per VEHICLE, so a vehicle that changed region is still
+    // counted once, with its periods added back together
+    const fleet = Object.values(buses.reduce((m, b) => {
+      const g = m[b.id] || (m[b.id] = { id: b.id, name: b.name, net: 0, revenue: 0, loyer: 0, worked: 0, days: 0, time_complete: true, split: 0 });
+      g.net += b.net || 0; g.revenue += b.revenue || 0; g.loyer += b.loyer || 0;
+      g.worked += b.worked_days; g.days += b.covered_days;
+      g.time_complete = g.time_complete && b.time_complete;
+      g.split += 1;
+      return m;
+    }, {})).map((g) => ({
+      ...g,
+      coverage: g.loyer > 0 ? Math.round((g.revenue / g.loyer) * 100) : null,
+      day_occ: g.days ? Math.round((g.worked / g.days) * 100) : 0,
+    }));
+
+    const n = fleet.length;
+    const withLoyer = fleet.filter((b) => b.coverage != null);
     const avgCov = withLoyer.length ? Math.round(withLoyer.reduce((a, b) => a + b.coverage, 0) / withLoyer.length) : 0;
-    const avgOcc = n ? Math.round(buses.reduce((a, b) => a + b.day_occ, 0) / n) : 0;
-    const profitable = buses.filter((b) => b.net != null && b.net >= 0).length;
-    const below = buses.filter((b) => b.coverage != null && b.coverage < 100);
-    const underused = buses.filter((b) => b.day_occ < 40);
-    const incomplete = buses.filter((b) => !b.time_complete);
-    const totalNet = buses.reduce((a, b) => a + (b.net || 0), 0);
+    const avgOcc = n ? Math.round(fleet.reduce((a, b) => a + b.day_occ, 0) / n) : 0;
+    const profitable = fleet.filter((b) => b.net >= 0).length;
+    const below = fleet.filter((b) => b.coverage != null && b.coverage < 100);
+    const underused = fleet.filter((b) => b.day_occ < 40);
+    const incomplete = fleet.filter((b) => !b.time_complete);
+    const moved = fleet.filter((b) => b.split > 1);
+    const totalNet = fleet.reduce((a, b) => a + b.net, 0);
     const key = sort === "cov" ? (a) => (a.coverage ?? 9999) : sort === "net" ? (a) => (a.net ?? 0) : (a) => a.day_occ;
     const sorted = [...buses].sort((a, b) => key(a) - key(b));
-    const best = buses.filter((b) => b.net != null).sort((a, b) => b.net - a.net)[0];
-    const worst = [...buses].sort((a, b) => a.day_occ - b.day_occ)[0];
-    return { buses, sorted, n, avgCov, avgOcc, profitable, below, underused, incomplete, totalNet, best, worst };
+    const best = fleet.filter((b) => b.net != null).sort((a, b) => b.net - a.net)[0];
+    const worst = [...fleet].sort((a, b) => a.day_occ - b.day_occ)[0];
+    return { buses, sorted, n, avgCov, avgOcc, profitable, below, underused, incomplete, moved, totalNet, best, worst };
   }, [data, sort]);
 
   const prev = () => { if (month === 1) { setMonth(12); setYear(year - 1); } else setMonth(month - 1); };
@@ -103,6 +124,14 @@ export default function AnalyticsView({ year, month, setYear, setMonth }) {
               {s.worst && <> Le plus faible : <b>{s.worst.name}</b> ({s.worst.day_occ}%).</>}
             </Insight>
           )}
+          {s.moved.length > 0 && (
+            <Insight tone="warn">
+              ↷ {s.moved.length} véhicule{s.moved.length > 1 ? "s ont" : " a"} changé de région ce mois-ci — une fiche
+              par période ci-dessous, sur ses jours à lui. Les recettes suivent la date exacte de chaque sortie ; le
+              loyer et le carburant sont répartis au prorata des jours. Les compteurs de flotte ci-dessus comptent
+              bien un seul véhicule.
+            </Insight>
+          )}
           {s.incomplete.length > 0 && (
             <Insight tone="warn">
               ⏱️ {s.incomplete.length} véhicule{s.incomplete.length > 1 ? "s ont" : " a"} des sorties sans horaire saisi — l'occupation en <b>jours</b> reste exacte, mais les <b>heures</b> de ces sorties ne sont pas comptées.
@@ -116,7 +145,7 @@ export default function AnalyticsView({ year, month, setYear, setMonth }) {
             ))}
           </div>
 
-          <div className="space-y-2">{s.sorted.map((b) => <BusRow key={b.id} b={b} />)}</div>
+          <div className="space-y-2">{s.sorted.map((b) => <BusRow key={b.key || b.id} b={b} />)}</div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             {s.best && <Highlight emoji="🏆" title="Meilleur résultat" name={s.best.name} value={fmtTND(s.best.net)} good />}
@@ -140,6 +169,12 @@ function BusRow({ b }) {
         <div className="min-w-0">
           <div className="truncate font-bold text-slate-700">{b.name}</div>
           <div className="text-[11px] text-slate-400">{b.region} · {b.type} · {b.trips} sortie{b.trips > 1 ? "s" : ""}</div>
+          {b.segment && (
+            <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600"
+                 title={`Ce véhicule a changé de région pendant le mois : cette fiche ne couvre que sa période à ${b.segment.region}. Revenu affecté à la date exacte des sorties ; loyer et carburant au prorata des ${b.segment.days} jours.`}>
+              ↷ période {b.segment.index + 1}/{b.segment.count} à {b.segment.region} · {b.segment.from.slice(8, 10)}/{b.segment.from.slice(5, 7)} → {b.segment.to.slice(8, 10)}/{b.segment.to.slice(5, 7)}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {inRed && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">En perte</span>}

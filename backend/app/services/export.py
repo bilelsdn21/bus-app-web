@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from .. import models
 from . import calc
 from .calendar import build_calendar
-from .lookups import region_periods_by_bus, region_for
+from .lookups import region_periods_by_bus, region_on
 from .alternatives import check_alternatives
 from .contracts import compute_contract_result
 from .analytics import build_analytics
@@ -36,6 +36,21 @@ DAY_FILL = {
     "red":    PatternFill("solid", fgColor="F43F5E"),
 }
 DAY_LABEL = {"green": "Résa", "yellow": "Matin", "orange": "Soir", "purple": "Nuit", "red": "Indispo"}
+
+
+def _fr(iso: str) -> str:
+    """'2026-06-18' -> '18/06' (compact date for in-cell region-change labels)."""
+    y, m, d = iso.split("-")
+    return f"{d}/{m}"
+
+
+def _seg_label(seg) -> str:
+    """'· Sousse 01/06→17/06 (puis Djerba)' — spells out, inside the sheet, which part
+    of the month a split row covers, so the export reads like the on-screen calendar."""
+    if not seg:
+        return ""
+    txt = f" · {seg['region']} {_fr(seg['from'])}→{_fr(seg['to'])}"
+    return txt + (f" (dès le {_fr(seg['moved_on'])})" if seg.get("moved_on") else "")
 
 
 def _autosize(ws, widths):
@@ -68,7 +83,7 @@ def _calendar_sheet(wb, data):
             ws.merge_cells(start_row=ws.max_row, start_column=1, end_row=ws.max_row, end_column=len(headers))
 
         covered = set(bus.get("covered_days") or [])
-        row = [bus["name"], bus["region"] or "—"]
+        row = [bus["name"] + _seg_label(bus.get("segment")), bus["region"] or "—"]
         for d in range(1, days_in_month + 1):
             color = bus["days"].get(d)
             if color:
@@ -92,7 +107,7 @@ def _calendar_sheet(wb, data):
         ws.cell(row=r, column=len(headers) - 2).number_format = '#,##0" TND"'
         ws.cell(row=r, column=len(headers)).number_format = '#,##0" km"'
 
-    _autosize(ws, [28, 10] + [6] * days_in_month + [13, 8, 13])
+    _autosize(ws, [40, 10] + [6] * days_in_month + [13, 8, 13])
     ws.freeze_panes = "C2"
 
 
@@ -114,7 +129,8 @@ def _excursions_sheet(wb, db: Session, year: int, month: int):
 
     for b in books:
         bus = b.bus
-        region = region_for(bus, start, end, periods_by_bus) if bus else ""
+        # the region on the trip's OWN date — exact, whatever happened mid-month
+        region = region_on(bus, b.date, periods_by_bus) if bus else ""
         ws.append([
             b.date.isoformat(), (b.end_date or b.date).isoformat(),
             bus.name if bus else f"#{b.bus_id}", region or "—",
@@ -141,6 +157,14 @@ def _summary_sheet(wb, data):
     t = data["summary"]["total"]
     ws.append(["TOTAL", round(t["loyer"], 2), round(t["net"], 2), t["pct"]])
     _style_row(ws, ws.max_row, TOTAL_FILL, TOTAL_FONT)
+
+    shared = data["summary"].get("shared") or 0
+    if shared:
+        ws.append([])
+        ws.append([f"ℹ {shared} véhicule(s) ont changé de région ce mois-ci : ils apparaissent dans les deux "
+                   f"régions, une ligne par période. Le revenu est affecté à la date exacte de chaque sortie ; "
+                   f"le loyer et le carburant sont répartis au prorata des jours."])
+        ws.cell(row=ws.max_row, column=1).font = Font(italic=True, color="475569")
 
     ws.append([])
     rentals = data["summary"]["rentals"]
@@ -378,7 +402,8 @@ def build_analytics_workbook(db: Session, year: int, month: int) -> BytesIO:
     _style_row(ws, ws.max_row, HEADER_FILL, HEADER_FONT)
     for b in data["buses"]:
         ws.append([
-            b["name"], b["type"], b["region"], b["revenue"], b["loyer"], b["fuel"], b["net"],
+            b["name"] + _seg_label(b.get("segment")), b["type"], b["region"],
+            b["revenue"], b["loyer"], b["fuel"], b["net"],
             b["coverage"] if b["coverage"] is not None else "—",
             b["trips"], b["covered_days"], b["worked_days"], b["day_occ"],
             b["timed_hours"], b["avg_hours"] if b["avg_hours"] is not None else "—",
@@ -388,7 +413,7 @@ def build_analytics_workbook(db: Session, year: int, month: int) -> BytesIO:
             ws.cell(row=ws.max_row, column=col).number_format = '#,##0.00" TND"'
     if not data["buses"]:
         ws.append(["Aucune donnée pour ce mois."])
-    _autosize(ws, [26, 8, 10, 13, 12, 13, 12, 12, 9, 10, 10, 11, 11, 11, 10, 10, 9])
+    _autosize(ws, [38, 8, 10, 13, 12, 13, 12, 12, 9, 10, 10, 11, 11, 11, 10, 10, 9])
     ws.freeze_panes = "A4"
 
     buf = BytesIO()

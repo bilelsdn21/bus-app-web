@@ -10,12 +10,15 @@ const MONTHS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 // Selectable years: from 2025 up to next year (extends automatically over time).
 const YEARS = (() => { const a = []; for (let y = 2025; y <= new Date().getFullYear() + 1; y++) a.push(y); return a; })();
+// "2026-06-18" -> "18/06"
+const dm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 export default function CalendarView({ year, month, setYear, setMonth, readOnly = false, username = "", onOpenContract }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // paint instantly from the last known answer (if any), then refresh in the background
+  const [data, setData] = useState(() => api.peek.calendar(year, month));
+  const [loading, setLoading] = useState(() => !api.peek.calendar(year, month));
   const [error, setError] = useState("");
-  const [dests, setDests] = useState([]);
+  const [dests, setDests] = useState(() => api.peek.destinations() || []);
   const [editor, setEditor] = useState(null); // {bus, iso}
 
   const reload = () => {
@@ -25,9 +28,17 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    const known = api.peek.calendar(year, month);
+    if (known) { setData(known); setLoading(false); } else setLoading(true);
     reload().finally(() => alive && setLoading(false));
-    return () => { alive = false; };
+    // warm the neighbouring months so the arrows feel instant
+    const t = setTimeout(() => {
+      const py = month === 1 ? year - 1 : year, pm = month === 1 ? 12 : month - 1;
+      const ny = month === 12 ? year + 1 : year, nm = month === 12 ? 1 : month + 1;
+      api.calendar(ny, nm).catch(() => {});
+      api.calendar(py, pm).catch(() => {});
+    }, 1200);
+    return () => { alive = false; clearTimeout(t); };
   }, [year, month]);
 
   useEffect(() => { api.destinations().then(setDests).catch(() => {}); }, []);
@@ -146,8 +157,9 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                   region = bus.region;
                   const net = bus.net;
                   const covered = bus.covered_days ? new Set(bus.covered_days) : null;
+                  const seg = bus.segment;   // set only when the vehicle changed region
                   return (
-                    <Fragment key={bus.id}>
+                    <Fragment key={bus.key || bus.id}>
                       {sep && (
                         <tr key={`r-${bus.region}`}>
                           <td colSpan={data.days_in_month + 4}
@@ -156,26 +168,44 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                           </td>
                         </tr>
                       )}
-                      <tr key={bus.id} className="border-b border-slate-200 bg-white odd:bg-slate-50 hover:bg-sky-50">
+                      <tr className="border-b border-slate-200 bg-white odd:bg-slate-50 hover:bg-sky-50">
                         <td className="sticky left-0 z-10 max-w-[190px] border-r border-slate-300 bg-inherit p-0">
                           <button onClick={() => onOpenContract?.(bus.id)} title={`Voir le contrat — ${bus.name}`}
                             className="block w-full truncate px-3 py-1.5 text-left font-semibold text-slate-700 transition hover:bg-sky-50 hover:text-sky-700">
                             {bus.name}
+                            {seg && (
+                              <span className="mt-0.5 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-amber-600"
+                                    title={`Ce véhicule a changé de région : il est resté à ${seg.region} du ${dm(seg.from)} au ${dm(seg.to)} (${seg.days} j). Cette ligne ne contient que ces jours-là.`}>
+                                <span className="rounded bg-amber-100 px-1 py-px text-amber-700">{seg.index + 1}/{seg.count}</span>
+                                {dm(seg.from)}→{dm(seg.to)}
+                                {seg.next_region && <span className="text-slate-400">↷ {seg.next_region}</span>}
+                                {seg.prev_region && <span className="text-slate-400">↶ {seg.prev_region}</span>}
+                              </span>
+                            )}
                           </button>
                         </td>
                         {Array.from({ length: data.days_in_month }, (_, i) => {
                           const day = i + 1;
                           const c = bus.days[day];
+                          const elsewhere = seg && (day < seg.day_from || day > seg.day_to);  // autre région
                           const out = covered && !covered.has(day);   // hors contrat
                           const dow = new Date(data.year, data.month - 1, day).getDay();
                           const weekend = dow === 0 || dow === 6;
+                          // amber rule exactly on the move date, so the switch is visible at a glance
+                          const edge = seg && !elsewhere
+                            ? (seg.index > 0 && day === seg.day_from ? "border-l-2 border-l-amber-400"
+                              : seg.index < seg.count - 1 && day === seg.day_to ? "border-r-2 border-r-amber-400" : "")
+                            : "";
+                          const outTitle = elsewhere
+                            ? `Hors région — le véhicule était à ${day < seg.day_from ? seg.prev_region : seg.next_region} ce jour-là`
+                            : "Hors contrat";
                           return (
-                            <td key={i} className={`border-r border-slate-200 px-0.5 py-1.5 text-center ${out ? "cell-out" : weekend ? "bg-slate-100/50" : ""}`}>
+                            <td key={i} className={`border-r border-slate-200 px-0.5 py-1.5 text-center ${edge} ${out ? "cell-out" : weekend ? "bg-slate-100/50" : ""}`}>
                               {c ? (
                                 <button onClick={() => openDay(bus, day)} title={`${DOT[c]?.label} — voir le détail`}
                                   className={`inline-block h-3.5 w-3.5 rounded-full ${DOT[c]?.bg || "bg-slate-300"} transition hover:scale-150 hover:ring-2 hover:ring-sky-300`} />
                               ) : out ? (
-                                <span className="inline-block h-3.5 w-3.5" title="Hors contrat" aria-hidden="true" />
+                                <span className="inline-block h-3.5 w-3.5" title={outTitle} aria-hidden="true" />
                               ) : (
                                 <button onClick={() => openDay(bus, day)} className="block h-3.5 w-3.5 opacity-0 hover:opacity-100" aria-label="jour" />
                               )}
@@ -186,10 +216,12 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                           {net == null ? (
                             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-400" title="Aucun contrat pour ce mois">Pas de contrat</span>
                           ) : (
-                            <span className={`rounded-md px-2 py-0.5 font-bold ${net >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                            <span className={`rounded-md px-2 py-0.5 font-bold ${net >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
+                              title={seg ? `Part ${seg.region} du ${dm(seg.from)} au ${dm(seg.to)} : revenu ${fmtTND(bus.revenue)} (sorties de ces jours-là) − loyer ${fmtTND(bus.loyer)} − carburant ${fmtTND(bus.fuel)}. Loyer et carburant au prorata des ${seg.days} jours ; total du contrat : ${fmtTND(bus.contract.net)}.` : undefined}>
                               {fmtTND(net)}
                             </span>
                           )}
+                          {seg && <span className="ml-1 align-middle text-[9px] font-bold uppercase text-amber-500" title="Part de la période — loyer et carburant au prorata des jours">part</span>}
                           {bus.is_estimated && <span className="ml-1 align-middle text-[9px] font-bold uppercase text-amber-500" title="Carburant estimé">est</span>}
                         </td>
                         <td className={`px-3 py-1.5 text-center font-semibold ${net == null ? "text-slate-300" : net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{bus.pct}</td>
@@ -206,6 +238,16 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
             {data.summary.regions.map((r) => <SummaryCard key={r.region} r={r} />)}
             <SummaryCard r={data.summary.total} grand />
           </div>
+
+          {data.summary.shared > 0 && (
+            <div className="rounded-xl bg-slate-50 px-4 py-3 text-[11px] text-slate-500 ring-1 ring-slate-200">
+              <span className="font-bold text-amber-600">↷ {data.summary.shared} véhicule{data.summary.shared > 1 ? "s ont" : " a"} changé de région ce mois-ci.</span>{" "}
+              Chacun apparaît une fois par région, sur ses jours à lui uniquement. Le revenu est affecté à la date
+              exacte de chaque sortie — rien n'est déplacé rétroactivement ; le loyer et le carburant sont répartis
+              au prorata des jours (mention <span className="font-bold uppercase text-amber-500">part</span>).
+              Les deux lignes additionnées redonnent exactement le total du contrat.
+            </div>
+          )}
 
           {data.summary.rentals && data.summary.rentals.total > 0 && (
             <div className="rounded-2xl bg-amber-50 p-4 shadow ring-1 ring-amber-200">

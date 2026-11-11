@@ -28,12 +28,17 @@ export default function SettingsView({ readOnly = false }) {
   );
 }
 
+const BLANK_FILTERS = { q: "", type: "", region: "", year: "", history: "", sort: "order" };
+
 function BusesPanel({ readOnly = false }) {
   const [buses, setBuses] = useState([]);
   const [form, setForm] = useState(null);
   const [err, setErr] = useState("");
   const [exporting, setExporting] = useState(false);
-  const load = () => api.buses().then(setBuses).catch((e) => setErr(e.message));
+  const [f, setF] = useState(BLANK_FILTERS);
+  // the overview carries what the Bus row alone can't answer: when the vehicle worked,
+  // how much is recorded on it, and whether its region history has holes
+  const load = () => api.busesOverview().then(setBuses).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
 
   const exportExcel = async () => {
@@ -47,12 +52,45 @@ function BusesPanel({ readOnly = false }) {
     setErr("");
     try {
       const p = { name: form.name, type: form.type, region: form.region,
-        distance: Number(form.distance) || 0, plate: form.plate || "" };
+        distance: Number(form.distance) || 0, plate: form.plate || "",
+        // a region change on an existing vehicle is a dated MOVE: the API refuses it
+        // without a date so past months keep the region they were worked in
+        region_effective_from: form.region_effective_from || null };
       if (form.id) await api.updateBus(form.id, p); else await api.createBus(p);
       setForm(null); load();
     } catch (e) { setErr(e.message); }
   };
   const del = async (b) => { if (!confirm(`Supprimer ${b.name} ?`)) return; try { await api.deleteBus(b.id); load(); } catch (e) { setErr(e.message); } };
+
+  const years = useMemo(
+    () => [...new Set(buses.flatMap((b) => b.years || []))].sort((a, b) => b - a),
+    [buses]
+  );
+
+  // every filter is a plain AND — an empty value means "don't filter on this"
+  const shown = useMemo(() => {
+    const q = f.q.trim().toLowerCase();
+    const out = buses.filter((b) => {
+      if (q && !`${b.name} ${b.plate}`.toLowerCase().includes(q)) return false;
+      if (f.type && b.type !== f.type) return false;
+      if (f.region === "__none__" ? !!b.region : f.region && b.region !== f.region) return false;
+      if (f.year && !(b.years || []).includes(Number(f.year))) return false;
+      if (f.history === "moved" && !b.moved) return false;
+      if (f.history === "stable" && b.moved) return false;
+      if (f.history === "gaps" && !b.past_gap_days) return false;
+      if (f.history === "idle" && b.contracts > 0) return false;
+      return true;
+    });
+    const by = {
+      name: (a, b) => a.name.localeCompare(b.name),
+      recent: (a, b) => (b.last_day || "").localeCompare(a.last_day || ""),
+      trips: (a, b) => b.trips - a.trips,
+    }[f.sort];
+    return by ? [...out].sort(by) : out;
+  }, [buses, f]);
+
+  const active = Object.entries(f).filter(([k, v]) => v && k !== "sort").length;
+  const gapCount = buses.filter((b) => b.past_gap_days).length;
 
   return (
     <div className="space-y-3">
@@ -65,20 +103,92 @@ function BusesPanel({ readOnly = false }) {
         </button>
       </div>
       <p className="text-xs text-slate-400">💡 Le loyer se définit par <b>contrat</b> (onglet Contrats), pas sur le véhicule.</p>
+
+      {/* Filters — they all apply together, an empty one is simply ignored */}
+      <div className="rounded-2xl bg-white p-3 shadow ring-1 ring-slate-200">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+          <input placeholder="🔎 Nom ou plaque…" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })}
+                 className={inp + " lg:col-span-2"} />
+          <select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })} className={inp}>
+            <option value="">Tous les types</option>
+            {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={f.region} onChange={(e) => setF({ ...f, region: e.target.value })} className={inp}>
+            <option value="">Toutes les régions</option>
+            {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            <option value="__none__">Région non définie</option>
+          </select>
+          <select value={f.year} onChange={(e) => setF({ ...f, year: e.target.value })} className={inp}>
+            <option value="">Toutes les saisons</option>
+            {years.map((y) => <option key={y} value={y}>Actif en {y}</option>)}
+          </select>
+          <select value={f.history} onChange={(e) => setF({ ...f, history: e.target.value })} className={inp}>
+            <option value="">Tout l&apos;historique</option>
+            <option value="stable">Jamais changé de région</option>
+            <option value="moved">A changé de région</option>
+            <option value="gaps">⚠️ Historique de région à trous{gapCount ? ` (${gapCount})` : ""}</option>
+            <option value="idle">Sans aucun contrat</option>
+          </select>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+          <span className="font-semibold text-slate-500">{shown.length} / {buses.length} véhicule(s)</span>
+          <label className="flex items-center gap-1.5 text-slate-400">
+            Trier
+            <select value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs outline-none focus:border-sky-500">
+              <option value="order">Ordre de la flotte</option>
+              <option value="name">Nom</option>
+              <option value="recent">Activité la plus récente</option>
+              <option value="trips">Nombre de sorties</option>
+            </select>
+          </label>
+          {active > 0 && (
+            <button onClick={() => setF({ ...BLANK_FILTERS, sort: f.sort })}
+                    className="rounded-lg bg-slate-100 px-2 py-1 font-semibold text-slate-500 hover:bg-slate-200">
+              ✕ Réinitialiser ({active})
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
         <table className="w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
-            <th className="px-3 py-2">Nom</th><th>Type</th><th>Région</th><th className="text-right">Distance</th>{!readOnly && <th></th>}
+            <th className="px-3 py-2">Nom</th><th>Type</th><th>Région</th>
+            <th>Saisons</th><th>Activité</th>
+            <th className="text-right">Contrats</th><th className="text-right">Sorties</th>
+            <th className="text-right">Distance</th>{!readOnly && <th></th>}
           </tr></thead>
           <tbody>
-            {buses.map((b) => (
+            {shown.length === 0 && (
+              <tr><td colSpan={9} className="px-3 py-6 text-center text-sm text-slate-400">
+                Aucun véhicule ne correspond à ces filtres.
+              </td></tr>
+            )}
+            {shown.map((b) => (
               <tr key={b.id} className="border-t border-slate-100">
-                <td className="px-3 py-2 font-semibold text-slate-700">{b.name}</td>
-                <td>{b.type}</td><td>{b.region}</td>
-                <td className="text-right">{b.distance ? Number(b.distance).toLocaleString("fr-FR") + " km" : "—"}</td>
+                <td className="px-3 py-2 font-semibold text-slate-700">
+                  {b.name}
+                  {!!b.past_gap_days && (
+                    <span title={`${b.past_gap_days} jour(s) d'activité sans période de région déclarée : ces jours prennent la région actuelle (${b.region}). Corrigez-les dans l'onglet « Régions par saison ».`}
+                          className="ml-1.5 cursor-help text-amber-500">⚠️</span>
+                  )}
+                </td>
+                <td>{b.type}</td>
+                <td>
+                  {b.region || <span className="text-slate-300">—</span>}
+                  {b.moved && <span className="ml-1 text-[10px] font-semibold text-slate-400">({b.regions.join(" / ")})</span>}
+                </td>
+                <td className="whitespace-nowrap text-xs text-slate-500">{(b.years || []).join(", ") || "—"}</td>
+                <td className="whitespace-nowrap text-xs text-slate-400">
+                  {b.first_day ? `${frDate(b.first_day)} → ${frDate(b.last_day)}` : "—"}
+                </td>
+                <td className="text-right">{b.contracts || <span className="text-slate-300">0</span>}</td>
+                <td className="text-right">{b.trips || <span className="text-slate-300">0</span>}</td>
+                <td className="whitespace-nowrap text-right">{b.distance ? Number(b.distance).toLocaleString("fr-FR") + " km" : "—"}</td>
                 {!readOnly && (
                   <td className="whitespace-nowrap pr-3 text-right">
-                    <button onClick={() => setForm({ ...b })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
+                    <button onClick={() => setForm({ ...b, _region0: b.region })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
                     <button onClick={() => del(b)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
                   </td>
                 )}
@@ -87,16 +197,32 @@ function BusesPanel({ readOnly = false }) {
           </tbody>
         </table>
       </div>
-      {form && (
-        <Modal title={`${form.id ? "Modifier" : "Nouveau"} véhicule`} onClose={() => setForm(null)} onSave={save} canSave={!!form.name}>
-          <L label="Nom (avec plaque, ex. BUS X 370 TU 243)"><input className={inp} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></L>
-          <div className="grid grid-cols-2 gap-3">
-            <L label="Type"><select className={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select></L>
-            <L label="Région"><select className={inp} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>{REGIONS.map((r) => <option key={r}>{r}</option>)}</select></L>
-          </div>
-          <L label="Distance (km / mois)"><input type="number" className={inp} value={form.distance} onChange={(e) => setForm({ ...form, distance: e.target.value })} /></L>
-        </Modal>
-      )}
+      {form && (() => {
+        const moving = !!form.id && form.region !== form._region0;
+        return (
+          <Modal title={`${form.id ? "Modifier" : "Nouveau"} véhicule`} onClose={() => setForm(null)} onSave={save}
+                 canSave={!!form.name && (!moving || !!form.region_effective_from)}>
+            <L label="Nom (avec plaque, ex. BUS X 370 TU 243)"><input className={inp} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></L>
+            <div className="grid grid-cols-2 gap-3">
+              <L label="Type"><select className={inp} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select></L>
+              <L label="Région"><select className={inp} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>{REGIONS.map((r) => <option key={r}>{r}</option>)}</select></L>
+            </div>
+            {moving && (
+              <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
+                <L label={`Date du déplacement vers ${form.region} (obligatoire)`}>
+                  <input type="date" className={inp} value={form.region_effective_from || ""}
+                         onChange={(e) => setForm({ ...form, region_effective_from: e.target.value })} />
+                </L>
+                <p className="mt-2 text-[11px] text-amber-700">
+                  Tout ce qui a été fait avant cette date reste à <b>{form._region0 || "—"}</b> et n'est pas recalculé.
+                  Le mois du déplacement s'affichera en deux lignes, une par région.
+                </p>
+              </div>
+            )}
+            <L label="Distance (km / mois)"><input type="number" className={inp} value={form.distance} onChange={(e) => setForm({ ...form, distance: e.target.value })} /></L>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
@@ -360,6 +486,7 @@ function RegionPeriodsPanel({ readOnly = false }) {
   const [busId, setBusId] = useState("");
   const [periods, setPeriods] = useState([]);
   const [form, setForm] = useState(null); // {id?, effective_from, effective_to, region}
+  const [move, setMove] = useState(null); // {region, moved_on} — record a change of region
   const [err, setErr] = useState("");
   const [exporting, setExporting] = useState(false);
 
@@ -398,16 +525,25 @@ function RegionPeriodsPanel({ readOnly = false }) {
     if (!confirm(`Supprimer cette période (${p.region}, dès ${frDate(p.effective_from)}) ?`)) return;
     try { await api.deleteRegionPeriod(p.id); loadPeriods(); } catch (e) { setErr(e.message); }
   };
+  const saveMove = async () => {
+    setErr("");
+    try {
+      await api.moveRegion({ bus_id: Number(busId), region: move.region, moved_on: move.moved_on });
+      setMove(null); loadPeriods(); api.buses().then(setBuses).catch(() => {});
+    } catch (e) { setErr(e.message); }
+  };
 
   return (
     <div className="space-y-4">
       {err && <Err msg={err} />}
       <div className="rounded-2xl bg-white p-4 shadow ring-1 ring-slate-200">
         <p className="mb-3 text-xs text-slate-400">
-          Un véhicule peut changer de région selon la saison. Ajoutez ici ses périodes passées — le Calendrier
-          et l'Analyse d'un mois donné utilisent automatiquement la région en vigueur ce mois-là. Sans période
-          définie, la région actuelle (onglet Véhicules) s'applique à tous les mois — rien ne change pour les
-          véhicules qui n'en ont pas besoin.
+          Un véhicule peut changer de région selon la saison. <b className="text-slate-500">Le véhicule bouge
+          aujourd'hui ? Utilisez « ↷ Déplacer »</b> : la période en cours est fermée la veille et la nouvelle
+          commence à la date du déplacement. Le Calendrier et l'Analyse découpent alors le mois en deux lignes,
+          une par région — les sorties déjà faites gardent la leur, à la date exacte, et rien n'est recalculé.
+          Le bouton « + Période » sert à saisir l'historique ancien. Sans aucune période, la région actuelle
+          (onglet Véhicules) s'applique à tous les mois — rien ne change pour les véhicules concernés.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <select value={busId} onChange={(e) => setBusId(e.target.value)} className={inp + " max-w-xs"}>
@@ -418,9 +554,15 @@ function RegionPeriodsPanel({ readOnly = false }) {
             {exporting ? "Export…" : "⬇️ Exporter Excel"}
           </button>
           {!readOnly && (
-            <button onClick={() => setForm({ effective_from: "", effective_to: "", region: bus?.region || REGIONS[0] })} className={btnPrimary}>
-              + Période
-            </button>
+            <>
+              <button onClick={() => setMove({ region: REGIONS.find((r) => r !== bus?.region) || REGIONS[0], moved_on: new Date().toISOString().slice(0, 10) })}
+                className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-amber-600">
+                ↷ Déplacer
+              </button>
+              <button onClick={() => setForm({ effective_from: "", effective_to: "", region: bus?.region || REGIONS[0] })} className={btnPrimary}>
+                + Période
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -464,6 +606,22 @@ function RegionPeriodsPanel({ readOnly = false }) {
           </div>
           {form.id && <p className="text-xs text-slate-400">La date de début ne peut pas être modifiée — supprimez et recréez la période pour la changer.</p>}
           <L label="Région"><select className={inp} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>{REGIONS.map((r) => <option key={r}>{r}</option>)}</select></L>
+        </Modal>
+      )}
+
+      {move && (
+        <Modal title={`Déplacer — ${bus?.name || ""}`} onClose={() => setMove(null)} onSave={saveMove}
+               canSave={!!move.moved_on && !!move.region}>
+          <div className="grid grid-cols-2 gap-3">
+            <L label="Nouvelle région"><select className={inp} value={move.region} onChange={(e) => setMove({ ...move, region: e.target.value })}>{REGIONS.map((r) => <option key={r}>{r}</option>)}</select></L>
+            <L label="Premier jour dans la nouvelle région"><input type="date" className={inp} value={move.moved_on} onChange={(e) => setMove({ ...move, moved_on: e.target.value })} /></L>
+          </div>
+          <div className="rounded-xl bg-amber-50 p-3 text-[11px] text-amber-700 ring-1 ring-amber-200">
+            La période en cours (<b>{bus?.region || "—"}</b>) sera fermée la veille. Tout ce qui a déjà été
+            enregistré avant cette date reste à <b>{bus?.region || "—"}</b>, avec ses recettes — rien n'est
+            déplacé ni recalculé. Sur le mois du déplacement, le véhicule apparaîtra sur deux lignes, une par
+            région, chacune avec ses propres jours ; leur somme redonne exactement le total du contrat.
+          </div>
         </Modal>
       )}
     </div>

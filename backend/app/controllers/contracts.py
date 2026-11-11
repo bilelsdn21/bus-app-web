@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..core.database import get_db
 from ..core.security import require_admin, require_user
 from .. import models, schemas
-from ..services.contracts import compute_contract_result
+from ..services.contracts import compute_contract_result, preload
 from ..services.audit import log_action
 
 # Reads require a signed-in account; writes add require_admin on top.
@@ -18,7 +18,8 @@ def list_contracts(bus_id: int | None = None, db: Session = Depends(get_db)):
     if bus_id:
         q = q.filter(models.Contract.bus_id == bus_id)
     contracts = q.order_by(models.Contract.start_date.desc()).all()
-    return [compute_contract_result(db, c) for c in contracts]
+    books, fuels = preload(db, contracts)
+    return [compute_contract_result(db, c, books=books, fuels=fuels) for c in contracts]
 
 
 @router.post("/api/contracts")

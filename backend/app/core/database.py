@@ -16,7 +16,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./bus_app.db")
 # SQLite needs this flag for multi-threaded FastAPI; Postgres ignores it.
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+_pool = {} if DATABASE_URL.startswith("sqlite") else {
+    "pool_size": 5, "max_overflow": 5,
+    "pool_recycle": 240,      # drop connections before the pooler/firewall silently kills them
+}
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True, **_pool)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

@@ -11,6 +11,7 @@ Run:  uvicorn app.main:app --reload --port 8000
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
 
 from .core.database import Base, engine
@@ -51,6 +52,9 @@ async def security_headers(request, call_next):
     resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     return resp
 
+
+# Compress JSON responses (calendar/analytics payloads shrink ~10x over the wire).
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Auth is via Bearer token (not cookies), so credentials aren't needed -> keep
 # them off, which makes the allowed-origins surface much lower-risk.

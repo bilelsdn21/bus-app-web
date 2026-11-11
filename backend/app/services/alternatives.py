@@ -12,9 +12,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models
-from . import calc
 from ..core.config import UNAVAIL_CATS
-from .lookups import region_periods_by_bus, region_for
+from .lookups import region_periods_by_bus, region_on
 
 FREE_MARK = "Libre"
 assert FREE_MARK in UNAVAIL_CATS
@@ -54,13 +53,14 @@ def check_alternatives(db: Session, vehicle_type: str, region: str, start_date: 
     days = []
     for off in range(days_total):
         d = start_date + timedelta(days=off)
-        m_start, m_end = calc.month_bounds(d.year, d.month)
         free_here = []
         for bus in buses:
             covered = any(c.start_date <= d <= c.end_date for c in contracts_by_bus.get(bus.id, []))
             if not covered or (bus.id, d) in busy:
                 continue
-            bus_region = region_for(bus, m_start, m_end, periods_by_bus)
+            # the region the bus was in ON THAT DAY — a bus that moved mid-month is only
+            # an alternative for the days it was actually in the rental's region
+            bus_region = region_on(bus, d, periods_by_bus)
             if region and bus_region != region:
                 continue
             free_here.append({"id": bus.id, "name": bus.name, "region": bus_region})

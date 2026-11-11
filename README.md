@@ -82,6 +82,30 @@ Period by **start time** (cutoffs editable in `config`: 13h / 22h):
 ## Data model (`backend/app/models.py`)
 `buses` (name, plate, type, region, loyer, distance) · `destinations` (category, name, prices) · `bookings` (date, bus_id FK, type, times, total…) · `config` (cutoffs).
 
+## Régions — a vehicle that moves mid-month
+A vehicle's region is **dated history**, never a value that gets overwritten. `region_periods`
+holds `[effective_from .. effective_to]` rows per bus; `Bus.region` only means "where it is now"
+and is the fallback for a bus that has no periods at all.
+
+**Recording a move** — Réglages → 🗺️ Régions par saison → **↷ Déplacer** (or change the region in
+the Véhicules tab, which then *requires* the move date). The API closes the current period the day
+before and opens the new one, back-filling the vehicle's earlier days with the region it is
+leaving. A region change can therefore never re-attribute a month already worked. `+ Période` is
+for back-filling old history; overlapping periods are rejected so the day-by-day region stays
+unambiguous.
+
+**How a split month reads** (`lookups.region_segments` cuts the window into single-region
+stretches — one stretch for a bus that never moved, so nothing changes for those):
+- Calendrier / Analyse show **one row per stretch**, the vehicle appearing under both region
+  blocks, each row carrying only its own days (the rest greyed as "hors région") and its own
+  share of the result. Rows are grouped so each region block stays contiguous.
+- **Revenue is exact**: every trip counts in the region the bus was in on the trip's own date.
+- **Loyer and fuel are day-prorated** across the stretches (a flat monthly amount has no per-day
+  truth) — flagged `part` in the UI. The stretches always sum back to the contract to the cent.
+- Region summary cards sum the stretches; a moved vehicle appears in both regions but counts once
+  in the fleet total. The Excel export carries the same split, and the Excursions sheet dates each
+  trip's region individually.
+
 ## Going live (later, free tier)
 1. Create a free **Supabase** project → copy the Postgres connection string.
 2. Set `DATABASE_URL=postgresql://...` in `backend/.env` → `python -m app.seed` → deploy backend (Render/Railway free).

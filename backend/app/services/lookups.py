@@ -1,5 +1,5 @@
 """Small DB lookups shared across controllers/services."""
-from datetime import date as _date
+from datetime import date as _date, timedelta as _timedelta
 from sqlalchemy.orm import Session
 from .. import models
 
@@ -48,15 +48,60 @@ def region_periods_by_bus(db: Session) -> dict[int, list]:
     return out
 
 
-def region_for(bus, start: _date, end: _date, periods_by_bus: dict[int, list]) -> str:
-    """The bus's region for a calendar month [start..end]: the historical region period
-    overlapping it the most (same "most overlap wins" rule used to pick a contract for
-    the month), or the bus's current `region` field if it has no periods."""
-    best, best_ov = None, 0
-    for p in periods_by_bus.get(bus.id, []):
+def _region_on_day(periods: list, day: _date, fallback: str) -> str:
+    """The region declared for one day. If several periods cover it (overlapping rows),
+    the one declared LAST (greatest effective_from) wins — a newer decision supersedes
+    an older one. No period covering the day -> the bus's current `region` field."""
+    best = None
+    for p in periods:
         p_end = p.effective_to or _date.max
-        s, e = max(p.effective_from, start), min(p_end, end)
-        ov = (e - s).days + 1 if s <= e else 0
-        if ov > best_ov:
-            best, best_ov = p, ov
-    return best.region if best else (bus.region or "")
+        if p.effective_from <= day <= p_end:
+            if best is None or p.effective_from > best.effective_from:
+                best = p
+    return best.region if best else fallback
+
+
+def region_on(bus, day: _date, periods_by_bus: dict[int, list]) -> str:
+    """The bus's region on ONE precise day — the day-level truth everything else is
+    derived from (a trip belongs to the region the bus was in on the day it ran)."""
+    return _region_on_day(periods_by_bus.get(bus.id, []), day, bus.region or "")
+
+
+def region_segments(bus, start: _date, end: _date, periods_by_bus: dict[int, list]) -> list[dict]:
+    """Cut [start..end] into consecutive stretches, each in ONE region.
+
+    This is the permanent answer to "the bus moved mid-period": instead of forcing a
+    whole month/contract into a single region, the window is split at the move date and
+    each side keeps its own days — so revenue booked before the move stays in the old
+    region and revenue booked after stays in the new one, forever, with nothing rewritten.
+
+    A bus that never moved yields exactly ONE segment covering the whole window, which
+    is why every caller behaves identically to before for such buses.
+    Returns [{region, from, to, days, index, count}], contiguous and gapless.
+    """
+    fallback = bus.region or ""
+    periods = periods_by_bus.get(bus.id, [])
+    segs: list[dict] = []
+    day = start
+    while day <= end:
+        r = _region_on_day(periods, day, fallback)
+        if segs and segs[-1]["region"] == r:
+            segs[-1]["to"] = day
+        else:
+            segs.append({"region": r, "from": day, "to": day})
+        day += _timedelta(days=1)
+    for i, s in enumerate(segs):
+        s["days"] = (s["to"] - s["from"]).days + 1
+        s["index"] = i
+        s["count"] = len(segs)
+    return segs
+
+
+def region_for(bus, start: _date, end: _date, periods_by_bus: dict[int, list]) -> str:
+    """A SINGLE region label for a window — the segment holding the most days.
+
+    Kept for anything that can only display one label. Do NOT use it for figures: it
+    collapses a mid-window move onto one side, which is exactly the loss of precision
+    region_segments() exists to prevent."""
+    segs = region_segments(bus, start, end, periods_by_bus)
+    return max(segs, key=lambda s: s["days"])["region"] if segs else (bus.region or "")

@@ -25,7 +25,42 @@ export function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+// ---- stale-while-revalidate cache for GETs --------------------------------------
+// The last good answer of every GET is kept in memory + localStorage, so a page can
+// paint instantly from it (api.peek) while the fresh answer loads in the background.
+const mem = new Map();
+const LS = "bus_cache:";
+export function peek(path) {
+  if (mem.has(path)) return mem.get(path);
+  try {
+    const raw = localStorage.getItem(LS + path);
+    if (raw) { const v = JSON.parse(raw); mem.set(path, v); return v; }
+  } catch {}
+  return null;
+}
+function remember(path, data) {
+  mem.set(path, data);
+  try { localStorage.setItem(LS + path, JSON.stringify(data)); }
+  catch { // quota: drop old entries, they are only an optimisation
+    try { Object.keys(localStorage).filter((k) => k.startsWith(LS)).forEach((k) => localStorage.removeItem(k)); } catch {}
+  }
+}
+export function clearCache() {
+  mem.clear();
+  try { Object.keys(localStorage).filter((k) => k.startsWith(LS)).forEach((k) => localStorage.removeItem(k)); } catch {}
+}
+// de-duplicate identical in-flight GETs (e.g. prefetch + real load)
+const inflight = new Map();
+
 async function req(path, opts = {}) {
+  const isGet = !opts.method || opts.method === "GET";
+  if (isGet && inflight.has(path)) return inflight.get(path);
+  const p = doReq(path, opts, isGet);
+  if (isGet) { inflight.set(path, p); p.finally(() => inflight.delete(path)).catch(() => {}); }
+  return p;
+}
+
+async function doReq(path, opts, isGet) {
   const token = authToken();
   const res = await fetch(BASE + path, {
     ...opts,
@@ -39,6 +74,7 @@ async function req(path, opts = {}) {
     // Session expired/invalid while we DID send a token -> log out to the login screen.
     if (res.status === 401 && token) {
       localStorage.removeItem("bus_auth");
+      clearCache();
       location.reload();
       throw new Error("Session expirée — reconnectez-vous.");
     }
@@ -46,14 +82,24 @@ async function req(path, opts = {}) {
     try { msg = (await res.json()).detail || msg; } catch {}
     throw new Error(msg);
   }
-  return res.status === 204 ? null : res.json();
+  const data = res.status === 204 ? null : await res.json();
+  if (isGet) remember(path, data);
+  return data;
 }
 
 export const api = {
+  peek: {
+    calendar: (y, m) => peek(`/api/calendar/${y}/${m}`),
+    analytics: (y, m) => peek(`/api/analytics/${y}/${m}`),
+    destinations: () => peek(`/api/destinations`),
+  },
   login: (username, password) => req(`/api/login`, { method: "POST", body: JSON.stringify({ username, password }) }),
   logout: () => req(`/api/logout`, { method: "POST" }),
   calendar: (y, m) => req(`/api/calendar/${y}/${m}`),
   buses: () => req(`/api/buses`),
+  // vehicles + the facts the Paramètres > Véhicules filter works on (activity span,
+  // years, counts, regions visited, holes in the region history)
+  busesOverview: () => req(`/api/buses/overview`),
   destinations: () => req(`/api/destinations`),
   config: () => req(`/api/config`),
   getDay: (busId, iso) => req(`/api/day/${busId}/${iso}`),
@@ -88,6 +134,9 @@ export const api = {
   deletePricePeriod: (id) => req(`/api/price-periods/${id}`, { method: "DELETE" }),
 
   regionPeriods: () => req(`/api/region-periods`),
+  // record a move ({bus_id, region, moved_on}) — closes the previous period the day
+  // before, so nothing already worked changes region
+  moveRegion: (p) => req(`/api/region-periods/move`, { method: "POST", body: JSON.stringify(p) }),
   setRegionPeriod: (p) => req(`/api/region-periods`, { method: "PUT", body: JSON.stringify(p) }),
   deleteRegionPeriod: (id) => req(`/api/region-periods/${id}`, { method: "DELETE" }),
 

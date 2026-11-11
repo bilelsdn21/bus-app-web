@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { api } from "./api.js";
+import { api, clearCache } from "./api.js";
 import CalendarView from "./components/CalendarView.jsx";
 import ContractsView from "./components/ContractsView.jsx";
 import RentedVehiclesView from "./components/RentedVehiclesView.jsx";
@@ -38,7 +38,7 @@ export default function App() {
 
   if (!auth) return <Login onLogin={setAuth} />;
 
-  const logout = () => { api.logout().catch(() => {}); localStorage.removeItem("bus_auth"); setAuth(null); };
+  const logout = () => { api.logout().catch(() => {}); localStorage.removeItem("bus_auth"); clearCache(); setAuth(null); };
   const openContract = (busId) => { setContractBus(busId); setMode("contracts"); };
 
   // tabs allowed per role. Viewer sees Calendrier + Contrats + Params (all read-only);

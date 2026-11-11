@@ -14,7 +14,10 @@ class BusBase(BaseModel):
     distance: float = 0.0
 
 class BusCreate(BusBase):
-    pass
+    # When an EXISTING vehicle's region changes and it already has activity recorded,
+    # the move date is required: the API records it as a dated period instead of
+    # silently re-attributing every past month (see controllers/buses.py).
+    region_effective_from: Optional[date] = None
 
 class BusOut(BusBase):
     model_config = ConfigDict(from_attributes=True)
@@ -146,6 +149,13 @@ class RegionPeriodIn(BaseModel):
 class RegionPeriodOut(RegionPeriodIn):
     model_config = ConfigDict(from_attributes=True)
     id: int
+
+class RegionMoveIn(BaseModel):
+    """Record that a vehicle moved region ON a date: closes the period it was in the
+    day before and opens the new one. The history before the move is never touched."""
+    bus_id: int
+    region: str
+    moved_on: date
 
 
 # ---- Rented vehicles (external reinforcement, not part of our fleet) ----

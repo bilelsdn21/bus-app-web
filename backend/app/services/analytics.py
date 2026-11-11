@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from . import calc
-from .contracts import compute_contract_result
-from .lookups import region_periods_by_bus, region_for
+from .contracts import compute_contract_result, preload
+from .lookups import region_periods_by_bus, region_segments
 
 
 def _overlap_days(a0, a1, b0, b1) -> int:
@@ -30,6 +30,39 @@ def _hours(hd: str, hf: str):
         return round(mins / 60, 1) if mins > 0 else None
     except Exception:
         return None
+
+
+def _time_stats(bks, w_from, w_to) -> dict:
+    """Occupancy stats restricted to one window [w_from..w_to] (already clipped to the
+    month). Worked DAYS are counted day by day, while a trip's count/hours belong to the
+    window containing its START date — the same rule the revenue split uses, so the
+    windows of a vehicle that moved region never double-count anything."""
+    worked, multi_days = set(), set()
+    timed_hours, timed_days, missing_time, trips = 0.0, 0, 0, 0
+    for b in bks:
+        is_multi = b.end_date is not None and b.end_date != b.date
+        s, e = max(b.date, w_from), min(b.end_date or b.date, w_to)
+        for off in range((e - s).days + 1 if s <= e else 0):
+            d = s + timedelta(days=off)
+            worked.add(d)
+            if is_multi:
+                multi_days.add(d)
+        if not (w_from <= b.date <= w_to):
+            continue
+        trips += 1
+        if not is_multi:
+            h = _hours(b.heure_debut or "", b.heure_fin or "")
+            if h is not None:
+                timed_hours += h
+                timed_days += 1
+            else:
+                missing_time += 1
+    return {
+        "trips": trips, "worked_days": len(worked), "multi_days": len(multi_days),
+        "timed_hours": round(timed_hours, 1),
+        "avg_hours": round(timed_hours / timed_days, 1) if timed_days else None,
+        "missing_time": missing_time,
+    }
 
 
 def build_analytics(db: Session, year: int, month: int) -> dict:
@@ -50,6 +83,10 @@ def build_analytics(db: Session, year: int, month: int) -> dict:
 
     periods_by_bus = region_periods_by_bus(db)
 
+    chosen_pool = [c for cs in contracts_by_bus.values() for c in cs
+                   if _overlap_days(c.start_date, c.end_date, start, end) > 0]
+    all_books, all_fuels = preload(db, chosen_pool)
+
     rows = []
     for bus in db.query(models.Bus).order_by(models.Bus.sort_order).all():
         overlapping = [c for c in contracts_by_bus.get(bus.id, [])
@@ -63,7 +100,6 @@ def build_analytics(db: Session, year: int, month: int) -> dict:
             s, e = max(c.start_date, start), min(c.end_date, end)
             for off in range((e - s).days + 1):
                 covered.add(s + timedelta(days=off))
-        covered_days = len(covered)
 
         # result from the contract overlapping the month the most
         chosen, best = None, 0
@@ -71,43 +107,45 @@ def build_analytics(db: Session, year: int, month: int) -> dict:
             ov = _overlap_days(c.start_date, c.end_date, start, end)
             if ov > best:
                 chosen, best = c, ov
-        res = compute_contract_result(db, chosen)
-        revenue, loyer = res["revenue"], res["loyer"]
-        coverage = round(revenue / loyer * 100) if loyer > 0 else None
 
-        # time occupancy from the trips themselves
+        # one row per single-region stretch of the contract: a vehicle that changed
+        # region mid-month is analysed once per region, on its own days only
+        segs = region_segments(bus, chosen.start_date, chosen.end_date, periods_by_bus)
+        res = compute_contract_result(db, chosen, segments=segs,
+                                      books=all_books, fuels=all_fuels)
         bks = books_by_bus.get(bus.id, [])
-        worked, multi_days = set(), set()
-        timed_hours, timed_days, missing_time = 0.0, 0, 0
-        for b in bks:
-            s, e = max(b.date, start), min(b.end_date or b.date, end)
-            is_multi = b.end_date is not None and b.end_date != b.date
-            for off in range((e - s).days + 1):
-                d = s + timedelta(days=off)
-                worked.add(d)
-                if is_multi:
-                    multi_days.add(d)
-            if not is_multi:
-                h = _hours(b.heure_debut or "", b.heure_fin or "")
-                if h is not None:
-                    timed_hours += h
-                    timed_days += 1
-                else:
-                    missing_time += 1
+        parts = res["segments"] if len(segs) > 1 else [None]
 
-        worked_days = len(worked)
-        region = region_for(bus, start, end, periods_by_bus)
-        rows.append({
-            "id": bus.id, "name": bus.name, "type": bus.type, "region": region or "—",
-            "revenue": revenue, "loyer": loyer, "fuel": res["fuel"], "net": res["net"],
-            "is_estimated": res["is_estimated"], "coverage": coverage,
-            "trips": len(bks), "covered_days": covered_days, "worked_days": worked_days,
-            "day_occ": round(worked_days / covered_days * 100) if covered_days else 0,
-            "timed_hours": round(timed_hours, 1),
-            "avg_hours": round(timed_hours / timed_days, 1) if timed_days else None,
-            "multi_days": len(multi_days),
-            "missing_time": missing_time,           # same-day trips with no hours entered
-            "time_complete": missing_time == 0,     # is the time data complete for this bus?
-        })
+        for i, p in enumerate(parts):
+            if p is None:      # never moved -> the whole month, exactly as before
+                w_from, w_to, region, seg = start, end, segs[0]["region"], None
+                revenue, loyer, fuel, net = res["revenue"], res["loyer"], res["fuel"], res["net"]
+            else:
+                s = segs[i]
+                ov_from, ov_to = max(s["from"], start), min(s["to"], end)
+                w_from = start if i == 0 else ov_from
+                w_to = end if i == len(segs) - 1 else ov_to
+                if ov_from > ov_to:       # stretch lies entirely in another month
+                    w_from, w_to = end + timedelta(days=1), end
+                region = s["region"]
+                revenue, loyer, fuel, net = p["revenue"], p["loyer"], p["fuel"], p["net"]
+                seg = {"region": region, "index": i, "count": len(segs),
+                       "from": p["from"], "to": p["to"], "days": p["days"],
+                       "moved_on": s["from"].isoformat() if i > 0 else None,
+                       "prorated": True}
+
+            seg_covered = len([d for d in covered if w_from <= d <= w_to])
+            st = _time_stats(bks, w_from, w_to)
+            rows.append({
+                "id": bus.id, "key": f"{bus.id}-{i}" if seg else str(bus.id),
+                "name": bus.name, "type": bus.type, "region": region or "—", "segment": seg,
+                "revenue": revenue, "loyer": loyer, "fuel": fuel, "net": net,
+                "is_estimated": res["is_estimated"],
+                "coverage": round(revenue / loyer * 100) if loyer > 0 else None,
+                "covered_days": seg_covered,
+                "day_occ": round(st["worked_days"] / seg_covered * 100) if seg_covered else 0,
+                "time_complete": st["missing_time"] == 0,   # is the time data complete?
+                **st,
+            })
 
     return {"year": year, "month": month, "label": f"{calc.MONTH_FR[month]} {year}", "buses": rows}
