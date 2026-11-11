@@ -175,7 +175,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                             {bus.name}
                             {seg && (
                               <span className="mt-0.5 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-amber-600"
-                                    title={`Ce véhicule a changé de région : il est resté à ${seg.region} du ${dm(seg.from)} au ${dm(seg.to)} (${seg.days} j). Cette ligne ne contient que ces jours-là.`}>
+                                    title={seg.contract_change ? `Changement de contrat/région : ${seg.region} du ${dm(seg.from)} au ${dm(seg.to)} (${seg.days} j). Cette ligne ne contient que ce contrat.` : `Ce véhicule a changé de région : il est resté à ${seg.region} du ${dm(seg.from)} au ${dm(seg.to)} (${seg.days} j). Cette ligne ne contient que ces jours-là.`}>
                                 <span className="rounded bg-amber-100 px-1 py-px text-amber-700">{seg.index + 1}/{seg.count}</span>
                                 {dm(seg.from)}→{dm(seg.to)}
                                 {seg.next_region && <span className="text-slate-400">↷ {seg.next_region}</span>}
@@ -217,11 +217,13 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-400" title="Aucun contrat pour ce mois">Pas de contrat</span>
                           ) : (
                             <span className={`rounded-md px-2 py-0.5 font-bold ${net >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
-                              title={seg ? `Part ${seg.region} du ${dm(seg.from)} au ${dm(seg.to)} : revenu ${fmtTND(bus.revenue)} (sorties de ces jours-là) − loyer ${fmtTND(bus.loyer)} − carburant ${fmtTND(bus.fuel)}. Loyer et carburant au prorata des ${seg.days} jours ; total du contrat : ${fmtTND(bus.contract.net)}.` : undefined}>
+                              title={seg ? (seg.prorated
+                                ? `Part ${seg.region} du ${dm(seg.from)} au ${dm(seg.to)} : revenu ${fmtTND(bus.revenue)} (sorties de ces jours-là) − loyer ${fmtTND(bus.loyer)} − carburant ${fmtTND(bus.fuel)}. Loyer et carburant au prorata des ${seg.days} jours ; total du contrat : ${fmtTND(bus.contract.net)}.`
+                                : `Contrat ${dm(seg.from)} → ${dm(seg.to)} (${seg.region}) : revenu ${fmtTND(bus.revenue)} − loyer ${fmtTND(bus.loyer)} − carburant ${fmtTND(bus.fuel)}.`) : undefined}>
                               {fmtTND(net)}
                             </span>
                           )}
-                          {seg && <span className="ml-1 align-middle text-[9px] font-bold uppercase text-amber-500" title="Part de la période — loyer et carburant au prorata des jours">part</span>}
+                          {seg?.prorated && <span className="ml-1 align-middle text-[9px] font-bold uppercase text-amber-500" title="Part de la période — loyer et carburant au prorata des jours">part</span>}
                           {bus.is_estimated && <span className="ml-1 align-middle text-[9px] font-bold uppercase text-amber-500" title="Carburant estimé">est</span>}
                         </td>
                         <td className={`px-3 py-1.5 text-center font-semibold ${net == null ? "text-slate-300" : net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{bus.pct}</td>

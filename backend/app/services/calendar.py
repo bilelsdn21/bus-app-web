@@ -15,6 +15,84 @@ def _overlap_days(a0, a1, b0, b1) -> int:
     return (e - s).days + 1 if s <= e else 0
 
 
+def _contract_block(c, res) -> dict:
+    return {"id": c.id, "label": c.label,
+            "start_date": c.start_date.isoformat(), "end_date": c.end_date.isoformat(),
+            "revenue": res["revenue"], "loyer": res["loyer"], "fuel": res["fuel"], "net": res["net"]}
+
+
+def _contract_change_rows(db, bus, overlapping, periods_by_bus, days, year, month, start, end,
+                          all_books, all_fuels) -> list[dict] | None:
+    """Rows for a vehicle whose contracts of the month are NOT all in one region.
+
+    Typical case: contract A (Sousse) ends on the 12th, contract B (Djerba) starts on the
+    13th. Each contract keeps its OWN result and its own region block, so nothing is
+    dropped (before, only the contract with the most days was shown and the other one's
+    revenue and rent vanished from the month). Every contract is cut at region moves too.
+
+    Display windows are contiguous and cover the whole month exactly once: the first row
+    is stretched back to day 1, each row runs up to the day before the next one starts,
+    the last to month end. Days between two contracts stay greyed (not covered) but are
+    never lost. Returns None when the contracts stay in one region (legacy single row).
+    """
+    plans = []
+    for c in overlapping:
+        segs = region_segments(bus, c.start_date, c.end_date, periods_by_bus)
+        plans.append((c, segs))
+    in_month = {sg["region"] for c, segs in plans for sg in segs
+                if sg["to"] >= start and sg["from"] <= end}
+    if len(overlapping) < 2 or len(in_month) < 2:
+        return None
+
+    parts = []
+    for c, segs in plans:
+        res = compute_contract_result(db, c, segments=segs, books=all_books, fuels=all_fuels)
+        cov = set()
+        s0, e0 = max(c.start_date, start), min(c.end_date, end)
+        for off in range((e0 - s0).days + 1):
+            cov.add((s0 + timedelta(days=off)).day)
+        for i, (sg, pr) in enumerate(zip(segs, res["segments"])):
+            parts.append({"c": c, "res": res, "cov": cov, "n": len(segs), "i": i, "s": sg, "p": pr,
+                          "ov_from": max(sg["from"], c.start_date, start),
+                          "ov_to": min(sg["to"], c.end_date, end)})
+    parts.sort(key=lambda q: (q["s"]["from"], q["c"].id))
+
+    live = [q for q in parts if q["ov_from"] <= q["ov_to"]]
+    for k, q in enumerate(live):
+        q["d_from"] = 1 if k == 0 else max(q["ov_from"].day, live[k - 1]["d_from"])
+    for k, q in enumerate(live):
+        q["d_to"] = (live[k + 1]["d_from"] if k + 1 < len(live) else end.day + 1) - 1
+    for q in parts:
+        if q not in live or q["d_to"] < q["d_from"]:
+            q["d_from"], q["d_to"] = 0, 0       # lies in another month: share shown, no days
+
+    rows = []
+    for k, q in enumerate(parts):
+        c, res, sg, pr = q["c"], q["res"], q["s"], q["p"]
+        span = set(range(q["d_from"], q["d_to"] + 1)) if q["d_from"] else set()
+        rows.append({
+            "id": bus.id, "name": bus.name, "type": bus.type, "distance": bus.distance,
+            "is_estimated": res["is_estimated"], "contract": _contract_block(c, res),
+            "_sort": bus.sort_order or 0,
+            "key": f"{bus.id}-{c.id}-{q['i']}", "region": sg["region"],
+            "covered_days": sorted(q["cov"] & span),
+            "days": {d: v for d, v in days.items() if d in span},
+            "net": pr["net"], "pct": pr["pct"], "revenue": pr["revenue"],
+            "loyer": pr["loyer"], "fuel": pr["fuel"],
+            "segment": {
+                "region": sg["region"], "index": k, "count": len(parts),
+                "from": pr["from"], "to": pr["to"], "days": pr["days"],
+                "prev_region": parts[k - 1]["s"]["region"] if k > 0 else None,
+                "next_region": parts[k + 1]["s"]["region"] if k < len(parts) - 1 else None,
+                "moved_on": sg["from"].isoformat() if k > 0 else None,
+                "day_from": q["d_from"], "day_to": q["d_to"],
+                "prorated": q["n"] > 1,       # only a contract cut by a move is prorated
+                "contract_change": True,
+            },
+        })
+    return rows
+
+
 def build_calendar(db: Session, year: int, month: int) -> dict:
     cfg = get_config(db)
     start, end = calc.month_bounds(year, month)
@@ -72,6 +150,14 @@ def build_calendar(db: Session, year: int, month: int) -> dict:
             cell = by_cell.get((bus.id, ds), [])
             if cell:
                 days[day] = calc.day_color(cell, cfg.cut_morn, cfg.cut_night)
+
+        # contracts of the month not all in one region (contract A -> contract B, mid-month)
+        overlapping.sort(key=lambda c: (c.start_date, c.end_date))
+        multi = _contract_change_rows(db, bus, overlapping, periods_by_bus, days, year, month,
+                                      start, end, all_books, all_fuels)
+        if multi is not None:
+            bus_list.extend(multi)
+            continue
 
         # net = result of the contract overlapping the viewed month the most
         chosen, best = None, 0

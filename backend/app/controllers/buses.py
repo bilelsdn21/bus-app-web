@@ -9,6 +9,7 @@ from ..core.security import require_admin, require_user
 from .. import models, schemas
 from ..services.audit import log_action
 from ..services.fleet import fleet_overview
+from ..services.lookups import norm_region
 
 # Reads require a signed-in account; writes add require_admin on top.
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -55,6 +56,7 @@ def _record_move(db: Session, bus: models.Bus, region: str, moved_on: date, admi
     This is the single writer of region history. Everything the vehicle did before
     `moved_on` keeps the region it had then, only the days from `moved_on` on get the
     new one — a region change can never re-attribute a past month's figures."""
+    region = norm_region(region)
     prev_day = moved_on - timedelta(days=1)
     periods = db.query(models.BusRegionPeriod).filter(models.BusRegionPeriod.bus_id == bus.id).all()
 
@@ -64,9 +66,9 @@ def _record_move(db: Session, bus: models.Bus, region: str, moved_on: date, admi
     # All the holes are filled, not just the one right before the move: history entered
     # month by month leaves gaps everywhere, and any one of them would flip.
     first_known = _first_known_day(db, bus, periods)
-    if first_known and (bus.region or ""):
+    if first_known and norm_region(bus.region):
         for gap_from, gap_to in _uncovered_ranges(periods, first_known, prev_day):
-            db.add(models.BusRegionPeriod(bus_id=bus.id, region=bus.region,
+            db.add(models.BusRegionPeriod(bus_id=bus.id, region=norm_region(bus.region),
                                           effective_from=gap_from, effective_to=gap_to))
 
     for p in periods:                       # nothing may stay open across the move date
@@ -92,7 +94,8 @@ def list_buses(db: Session = Depends(get_db)):
 def create_bus(body: schemas.BusCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     if db.query(models.Bus).filter(models.Bus.name == body.name).first():
         raise HTTPException(409, "Un véhicule avec ce nom existe déjà.")
-    bus = models.Bus(**body.model_dump(exclude={"region_effective_from"}))
+    bus = models.Bus(**{**body.model_dump(exclude={"region_effective_from"}),
+                        "region": norm_region(body.region)})
     db.add(bus); db.flush()
     log_action(db, _admin, "Véhicule", f"Ajout : {bus.name}")
     db.commit(); db.refresh(bus)
@@ -108,7 +111,7 @@ def update_bus(bus_id: int, body: schemas.BusCreate, db: Session = Depends(get_d
     # A region change on a vehicle that already has activity is a MOVE, not a
     # correction: it needs a date, and it is written as a period so the months already
     # recorded keep the region they were actually worked in.
-    moving = (body.region or "") != (bus.region or "")
+    moving = norm_region(body.region) != norm_region(bus.region)
     # History is not only trips: a contract alone already puts the vehicle on the
     # Calendrier/Analyse of a past month, and an existing region period is history by
     # definition. Any of them makes a region change a dated MOVE.
@@ -127,7 +130,7 @@ def update_bus(bus_id: int, body: schemas.BusCreate, db: Session = Depends(get_d
     if moving and has_history:
         _record_move(db, bus, body.region, body.region_effective_from, _admin)
     else:
-        bus.region = body.region
+        bus.region = norm_region(body.region)
     log_action(db, _admin, "Véhicule", f"Modification : {bus.name}")
     db.commit(); db.refresh(bus)
     return bus
@@ -162,9 +165,9 @@ def move_region(body: schemas.RegionMoveIn, db: Session = Depends(get_db), _admi
     bus = db.get(models.Bus, body.bus_id)
     if not bus:
         raise HTTPException(404, "Véhicule introuvable.")
-    if not (body.region or "").strip():
+    if not norm_region(body.region):
         raise HTTPException(422, "Région manquante.")
-    rp = _record_move(db, bus, body.region.strip(), body.moved_on, _admin)
+    rp = _record_move(db, bus, norm_region(body.region), body.moved_on, _admin)
     db.commit(); db.refresh(rp)
     return rp
 
@@ -193,7 +196,7 @@ def upsert_region_period(body: schemas.RegionPeriodIn, db: Session = Depends(get
         rp = models.BusRegionPeriod(bus_id=body.bus_id, effective_from=body.effective_from)
         db.add(rp)
     rp.effective_to = body.effective_to
-    rp.region = body.region
+    rp.region = norm_region(body.region)
     bus = db.get(models.Bus, body.bus_id)
     log_action(db, _admin, "Région période",
                f"{bus.name if bus else body.bus_id} {body.effective_from}→{body.effective_to}: {body.region}")

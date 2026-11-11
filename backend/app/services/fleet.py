@@ -15,6 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models
+from .lookups import norm_region
 
 DAY = timedelta(days=1)
 
@@ -75,7 +76,8 @@ def fleet_overview(db: Session) -> list[dict]:
         years = sorted({y for s, e in ctr for y in range(s.year, e.year + 1)})
 
         # every region the vehicle has ever been in, current one included
-        regions = sorted({p.region for p in per if p.region} | ({bus.region} if bus.region else set()))
+        regions = sorted({norm_region(p.region) for p in per if norm_region(p.region)}
+                         | ({norm_region(bus.region)} if norm_region(bus.region) else set()))
 
         # A hole AFTER the last declared period is the normal "it is there now and we
         # never wrote it down" case. A hole BEFORE or BETWEEN periods is the harmful
@@ -92,7 +94,7 @@ def fleet_overview(db: Session) -> list[dict]:
 
         rows.append({
             "id": bus.id, "name": bus.name, "plate": bus.plate or "", "type": bus.type,
-            "region": bus.region or "", "distance": bus.distance or 0.0,
+            "region": norm_region(bus.region), "distance": bus.distance or 0.0,
             "contracts": len(ctr), "trips": len(trp),
             "first_day": activity[0][0].isoformat() if activity else None,
             "last_day": activity[-1][1].isoformat() if activity else None,

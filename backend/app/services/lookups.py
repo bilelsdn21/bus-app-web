@@ -1,7 +1,20 @@
 """Small DB lookups shared across controllers/services."""
+import re as _re
 from datetime import date as _date, timedelta as _timedelta
 from sqlalchemy.orm import Session
 from .. import models
+
+
+def norm_region(name) -> str:
+    """The ONE canonical spelling of a region name.
+
+    Regions are compared and grouped as plain text everywhere (calendar blocks, region
+    segments, analytics). "Djerba", "Djerba " and "DJERBA" must therefore be the same
+    region, or the calendar shows two Djerba blocks and a vehicle that stays put looks
+    like it moved. Whitespace is collapsed and each word is capitalised ("Nord-Ouest",
+    "M'saken"); every read AND every write goes through here."""
+    s = " ".join(str(name or "").split())
+    return _re.sub(r"[^\s\-]+", lambda m: m.group(0)[:1].upper() + m.group(0)[1:].lower(), s)
 
 
 def get_config(db: Session) -> models.Config:
@@ -58,7 +71,7 @@ def _region_on_day(periods: list, day: _date, fallback: str) -> str:
         if p.effective_from <= day <= p_end:
             if best is None or p.effective_from > best.effective_from:
                 best = p
-    return best.region if best else fallback
+    return norm_region(best.region if best else fallback)
 
 
 def region_on(bus, day: _date, periods_by_bus: dict[int, list]) -> str:
@@ -79,7 +92,7 @@ def region_segments(bus, start: _date, end: _date, periods_by_bus: dict[int, lis
     is why every caller behaves identically to before for such buses.
     Returns [{region, from, to, days, index, count}], contiguous and gapless.
     """
-    fallback = bus.region or ""
+    fallback = norm_region(bus.region)
     periods = periods_by_bus.get(bus.id, [])
     segs: list[dict] = []
     day = start
@@ -104,4 +117,4 @@ def region_for(bus, start: _date, end: _date, periods_by_bus: dict[int, list]) -
     collapses a mid-window move onto one side, which is exactly the loss of precision
     region_segments() exists to prevent."""
     segs = region_segments(bus, start, end, periods_by_bus)
-    return max(segs, key=lambda s: s["days"])["region"] if segs else (bus.region or "")
+    return max(segs, key=lambda s: s["days"])["region"] if segs else norm_region(bus.region)

@@ -3,6 +3,7 @@ calendar month(s) each rental's period overlaps, grouped by region."""
 from sqlalchemy.orm import Session
 from .. import models
 from . import calc
+from .lookups import norm_region
 
 
 def rented_vehicles_summary(db: Session, year: int, month: int) -> dict:
@@ -17,9 +18,9 @@ def rented_vehicles_summary(db: Session, year: int, month: int) -> dict:
         cost = calc.prorate_period_cost(r.start_date, r.end_date, r.cost, year, month)
         if cost <= 0:
             continue
-        reg = r.region or "—"
+        reg = norm_region(r.region) or "—"
         by_region[reg] = by_region.get(reg, 0.0) + cost
-        items.append({"id": r.id, "name": r.name, "region": r.region, "cost": cost})
+        items.append({"id": r.id, "name": r.name, "region": norm_region(r.region) or None, "cost": cost})
 
     return {
         "year": year, "month": month,

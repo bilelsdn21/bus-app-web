@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..core.config import UNAVAIL_CATS
-from .lookups import region_periods_by_bus, region_on
+from .lookups import region_periods_by_bus, region_on, norm_region
 
 FREE_MARK = "Libre"
 assert FREE_MARK in UNAVAIL_CATS
@@ -22,6 +22,7 @@ assert FREE_MARK in UNAVAIL_CATS
 def check_alternatives(db: Session, vehicle_type: str, region: str, start_date: date, end_date: date) -> dict:
     buses = db.query(models.Bus).filter(models.Bus.type == vehicle_type).order_by(models.Bus.sort_order).all()
     days_total = (end_date - start_date).days + 1
+    region = norm_region(region)
 
     if not buses:
         return {"days_total": days_total, "days_with_alternative": 0, "days": [], "fleet_count": 0}
