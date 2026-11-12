@@ -7,7 +7,7 @@ import SettingsView from "./components/SettingsView.jsx";
 import JournalView from "./components/JournalView.jsx";
 import AnalyticsView from "./components/AnalyticsView.jsx";
 import Login from "./components/Login.jsx";
-import NotifyButton from "./components/NotifyButton.jsx";
+import NotifyButton, { NotifyPrompt } from "./components/NotifyButton.jsx";
 import Logo from "./components/Logo.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -95,6 +95,8 @@ export default function App() {
           </div>
         </ErrorBoundary>
       </main>
+
+      <NotifyPrompt />
 
       {/* phone: thumb-reach tab bar pinned to the bottom */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#13294a] shadow-[0_-4px_16px_rgba(0,0,0,.25)] sm:hidden">

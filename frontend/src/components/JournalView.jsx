@@ -23,6 +23,46 @@ function icon(detail = "") {
   return "•";
 }
 
+// Admin tool: send one notification to every phone that turned notifications on.
+function AnnounceBox() {
+  const [title, setTitle] = useState("🚀 Mise à jour disponible");
+  const [body, setBody] = useState("L'application a été améliorée : calendrier plus rapide et plus simple sur téléphone. Ouvrez-la pour voir les nouveautés.");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null); // {ok, text}
+
+  const send = async () => {
+    if (!title.trim() || !body.trim()) return;
+    if (!window.confirm("Envoyer cette notification à TOUS les téléphones abonnés ?")) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await api.announce({ title: title.trim(), body: body.trim(), url: "/" });
+      if (r.error) setMsg({ ok: false, text: r.error });
+      else setMsg({ ok: true, text: `Envoyée à ${r.sent} téléphone${r.sent > 1 ? "s" : ""}` +
+        (r.failed ? ` · ${r.failed} échec${r.failed > 1 ? "s" : ""}` : "") + (r.pruned ? ` · ${r.pruned} abonnement${r.pruned > 1 ? "s" : ""} périmé${r.pruned > 1 ? "s" : ""} retiré${r.pruned > 1 ? "s" : ""}` : "") +
+        (r.total === 0 ? " — personne n'a encore activé les notifications" : "") });
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="space-y-2 rounded-2xl bg-white p-4 shadow ring-1 ring-slate-200">
+      <div className="text-sm font-bold text-[#1a3a5c]">📣 Envoyer une notification à tous</div>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-amber-400" placeholder="Titre" />
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} maxLength={200} rows={3}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-amber-400" placeholder="Message" />
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={send} disabled={busy || !title.trim() || !body.trim()}
+          className="h-11 rounded-lg bg-amber-500 px-5 text-sm font-bold text-[#13294a] shadow active:scale-95 disabled:opacity-50">
+          {busy ? "Envoi…" : "Envoyer"}
+        </button>
+        {msg && <span className={`text-sm font-semibold ${msg.ok ? "text-emerald-600" : "text-rose-600"}`}>{msg.ok ? "✓ " : ""}{msg.text}</span>}
+      </div>
+      <p className="text-[11px] text-slate-400">Seuls les téléphones qui ont activé la cloche 🔔 la reçoivent.</p>
+    </div>
+  );
+}
+
 // `full` (owner) shows everything incl. logins/logouts; otherwise (admin) only data changes.
 export default function JournalView({ full = false }) {
   const [rows, setRows] = useState(null);
@@ -43,6 +83,7 @@ export default function JournalView({ full = false }) {
 
   return (
     <div className="space-y-4">
+      <AnnounceBox />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">🧾 Journal d'activité</h1>
         <div className="flex items-center gap-2">

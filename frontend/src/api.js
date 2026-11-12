@@ -202,4 +202,5 @@ export const api = {
   pushSubscribe: (sub) => req(`/api/push/subscribe`, { method: "POST", body: JSON.stringify(sub) }),
   pushUnsubscribe: (sub) => req(`/api/push/unsubscribe`, { method: "POST", body: JSON.stringify(sub) }),
   notifyTest: () => req(`/api/notify/test`, { method: "POST" }),
+  announce: (p) => req(`/api/notify/announce`, { method: "POST", body: JSON.stringify(p) }),
 };
