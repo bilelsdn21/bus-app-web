@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { api, downloadBlob } from "../api.js";
 import { DOT, fmtTND } from "../colors.js";
 import ExcursionEditor from "./ExcursionEditor.jsx";
@@ -62,6 +62,20 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
     setEditor({ bus, iso });
   };
 
+  // today's day number when the viewed month is the current one (else null)
+  const nowD = new Date();
+  const todayDay = data && data.year === nowD.getFullYear() && data.month === nowD.getMonth() + 1 ? nowD.getDate() : null;
+
+  // on a phone the table is wider than the screen: open it scrolled to today
+  const scroller = useRef(null);
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box || loading || !todayDay) return;
+    const th = box.querySelector(`th[data-day="${todayDay}"]`);
+    const first = box.querySelector("th");
+    if (th && first) box.scrollLeft = Math.max(0, th.offsetLeft - first.offsetWidth - th.offsetWidth * 2);
+  }, [loading, data?.year, data?.month, todayDay]);
+
   let region = null;
   const todayLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const monthNet = data?.summary?.total?.net;
@@ -114,7 +128,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
         <span className="inline-flex items-center gap-1.5">
           <span className="cell-out inline-block h-3 w-3 rounded ring-1 ring-slate-200" /> Hors contrat
         </span>
-        <span className="text-slate-400">· cliquez une case jour pour {readOnly ? "voir" : "ajouter / modifier"} les excursions</span>
+        <span className="text-slate-400">· touchez une case jour pour {readOnly ? "voir" : "ajouter / modifier"} les excursions</span>
       </div>
 
       {error && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>}
@@ -130,17 +144,17 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
 
       {data && !loading && data.buses.length > 0 && (
         <>
-          <div className="max-h-[75vh] overflow-auto rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
+          <div ref={scroller} className="scroll-x max-h-[72vh] overflow-auto rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="text-white">
-                  <th className="sticky left-0 top-0 z-30 border-r border-white/20 bg-[#1a3a5c] px-3 py-2 text-left font-semibold min-w-[190px]">Véhicule</th>
+                  <th className="sticky left-0 top-0 z-30 border-r border-white/20 bg-[#1a3a5c] px-3 py-2 text-left font-semibold min-w-[128px] sm:min-w-[190px]">Véhicule</th>
                   {Array.from({ length: data.days_in_month }, (_, i) => {
                     const day = i + 1;
                     const dow = new Date(data.year, data.month - 1, day).getDay(); // 0=dim … 6=sam
                     const weekend = dow === 0 || dow === 6;
                     return (
-                      <th key={i} className={`sticky top-0 z-20 w-7 border-r border-white/10 px-0.5 py-1 text-center font-medium ${weekend ? "bg-[#24507a]" : "bg-[#1a3a5c]"}`}>
+                      <th key={i} data-day={day} className={`sticky top-0 z-20 w-9 min-w-[36px] border-r border-white/10 px-0.5 py-1 text-center font-medium sm:w-7 sm:min-w-0 ${day === todayDay ? "bg-amber-500 text-[#13294a]" : weekend ? "bg-[#24507a]" : "bg-[#1a3a5c]"}`}>
                         <div className={`text-[9px] font-semibold uppercase leading-none ${weekend ? "text-amber-300" : "text-sky-300"}`}>{WEEKDAYS_FR[dow]}</div>
                         <div className="leading-tight">{day}</div>
                       </th>
@@ -169,9 +183,9 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                         </tr>
                       )}
                       <tr className="border-b border-slate-200 bg-white odd:bg-slate-50 hover:bg-sky-50">
-                        <td className="sticky left-0 z-10 max-w-[190px] border-r border-slate-300 bg-inherit p-0">
+                        <td className="sticky left-0 z-10 max-w-[128px] border-r border-slate-300 bg-inherit p-0 sm:max-w-[190px]">
                           <button onClick={() => onOpenContract?.(bus.id)} title={`Voir le contrat — ${bus.name}`}
-                            className="block w-full truncate px-3 py-1.5 text-left font-semibold text-slate-700 transition hover:bg-sky-50 hover:text-sky-700">
+                            className="block w-full truncate px-2 py-2.5 text-left text-[11px] font-semibold text-slate-700 sm:px-3 sm:py-1.5 sm:text-xs transition hover:bg-sky-50 hover:text-sky-700">
                             {bus.name}
                             {seg && (
                               <span className="mt-0.5 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-amber-600"
@@ -200,14 +214,14 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
                             ? `Hors région — le véhicule était à ${day < seg.day_from ? seg.prev_region : seg.next_region} ce jour-là`
                             : "Hors contrat";
                           return (
-                            <td key={i} className={`border-r border-slate-200 px-0.5 py-1.5 text-center ${edge} ${out ? "cell-out" : weekend ? "bg-slate-100/50" : ""}`}>
+                            <td key={i} className={`border-r border-slate-200 px-0.5 py-2 text-center sm:py-1.5 ${edge} ${out ? "cell-out" : day === todayDay ? "today-col" : weekend ? "bg-slate-100/50" : ""}`}>
                               {c ? (
                                 <button onClick={() => openDay(bus, day)} title={`${DOT[c]?.label} — voir le détail`}
-                                  className={`inline-block h-3.5 w-3.5 rounded-full ${DOT[c]?.bg || "bg-slate-300"} transition hover:scale-150 hover:ring-2 hover:ring-sky-300`} />
+                                  className={`inline-block h-4 w-4 rounded-full sm:h-3.5 sm:w-3.5 ${DOT[c]?.bg || "bg-slate-300"} transition active:scale-125 hover:scale-150 hover:ring-2 hover:ring-sky-300`} />
                               ) : out ? (
                                 <span className="inline-block h-3.5 w-3.5" title={outTitle} aria-hidden="true" />
                               ) : (
-                                <button onClick={() => openDay(bus, day)} className="block h-3.5 w-3.5 opacity-0 hover:opacity-100" aria-label="jour" />
+                                <button onClick={() => openDay(bus, day)} className="mx-auto block h-5 w-5 opacity-0 hover:opacity-100 active:opacity-100 sm:h-3.5 sm:w-3.5" aria-label="jour" />
                               )}
                             </td>
                           );

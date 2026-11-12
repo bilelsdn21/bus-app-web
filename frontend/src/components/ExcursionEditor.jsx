@@ -68,14 +68,14 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4" onClick={onClose}>
-      <div className="flex max-h-[88vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="safe-bottom flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between rounded-t-2xl bg-[#1a3a5c] px-5 py-4 text-white">
           <div>
             <div className="text-sm font-bold">{bus.name}</div>
             <div className="text-xs capitalize text-sky-200">{dateLabel}</div>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white">✕</button>
+          <button onClick={onClose} aria-label="Fermer" className="-m-2 p-2 text-lg text-white/70 hover:text-white">✕</button>
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-5">
@@ -154,7 +154,7 @@ export default function ExcursionEditor({ bus, dayISO, dests, readOnly = false, 
       </div>
     </div>
     {toast && (
-      <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-lg">
+      <div className="fixed bottom-24 left-1/2 z-[60] sm:bottom-6 -translate-x-1/2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-lg">
         ✓ {toast}
       </div>
     )}

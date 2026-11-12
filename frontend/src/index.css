@@ -20,3 +20,15 @@ body { min-height: 100%; margin: 0; overscroll-behavior-y: none;
 
 /* calendar days outside the vehicle's contract window ("hors contrat") */
 .cell-out { background-image: repeating-linear-gradient(45deg, #eef2f6, #eef2f6 2px, #f8fafc 2px, #f8fafc 5px); }
+
+/* ---- phone ergonomics ---- */
+/* iOS zooms the whole page when a field under 16px gets focus: keep fields at 16px on phones */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* the bottom tab bar sits above the iPhone home indicator */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+/* momentum scrolling + no sideways page drag inside the wide calendar table */
+.scroll-x { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+/* today's column in the calendar */
+.today-col { background-color: rgb(254 243 199 / .55); }

@@ -65,7 +65,7 @@ export default function App() {
               <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-300/90">Gestion des Bus</div>
             </div>
           </div>
-          <nav className="flex flex-wrap gap-1 rounded-xl bg-white/10 p-1">
+          <nav className="hidden flex-wrap gap-1 rounded-xl bg-white/10 p-1 sm:flex">
             {tabs.map(([key, label]) => (
               <Tab key={key} on={effMode === key} onClick={() => setMode(key)}>{label}</Tab>
             ))}
@@ -83,7 +83,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
+      <main className="mx-auto max-w-7xl px-3 py-4 pb-24 sm:px-4 sm:py-6 sm:pb-6">
         <ErrorBoundary key={effMode}>
           <div className="animate-fadein">
             {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} username={auth.username} onOpenContract={openContract} />}
@@ -95,6 +95,25 @@ export default function App() {
           </div>
         </ErrorBoundary>
       </main>
+
+      {/* phone: thumb-reach tab bar pinned to the bottom */}
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#13294a] shadow-[0_-4px_16px_rgba(0,0,0,.25)] sm:hidden">
+        <div className="mx-auto flex max-w-7xl">
+          {tabs.map(([key, label]) => {
+            const [icon, ...rest] = label.split(" ");
+            const on = effMode === key;
+            return (
+              <button key={key} onClick={() => { setMode(key); window.scrollTo({ top: 0 }); }}
+                aria-current={on ? "page" : undefined}
+                className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 pb-1.5 pt-2 text-[10px] font-semibold transition ${on ? "text-amber-300" : "text-white/60 active:text-white"}`}>
+                <span className={`text-lg leading-none ${on ? "" : "opacity-80"}`}>{icon}</span>
+                <span className="w-full truncate text-center">{rest.join(" ")}</span>
+                {on && <span className="mt-0.5 h-0.5 w-6 rounded-full bg-amber-300" />}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
