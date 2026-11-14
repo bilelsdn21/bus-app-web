@@ -171,7 +171,9 @@ function BusRow({ b }) {
           <div className="text-[11px] text-slate-400">{b.region} · {b.type} · {b.trips} sortie{b.trips > 1 ? "s" : ""}</div>
           {b.segment && (
             <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600"
-                 title={`Ce véhicule a changé de région pendant le mois : cette fiche ne couvre que sa période à ${b.segment.region}. Revenu affecté à la date exacte des sorties ; loyer et carburant au prorata des ${b.segment.days} jours.`}>
+                 title={b.segment.prorated
+                   ? `Ce véhicule a changé de région pendant le mois : cette fiche ne couvre que sa période à ${b.segment.region}. Revenu affecté à la date exacte des sorties ; loyer et carburant au prorata des ${b.segment.days} jours.`
+                   : `Changement de contrat pendant le mois : cette fiche ne couvre que ce contrat (${b.segment.region}).`}>
               ↷ période {b.segment.index + 1}/{b.segment.count} à {b.segment.region} · {b.segment.from.slice(8, 10)}/{b.segment.from.slice(5, 7)} → {b.segment.to.slice(8, 10)}/{b.segment.to.slice(5, 7)}
             </div>
           )}

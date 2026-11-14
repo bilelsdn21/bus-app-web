@@ -14,6 +14,7 @@ from .. import models
 from . import calc
 from .contracts import compute_contract_result, preload
 from .lookups import region_periods_by_bus, region_segments
+from .calendar import contract_change_parts
 
 
 def _overlap_days(a0, a1, b0, b1) -> int:
@@ -100,6 +101,40 @@ def build_analytics(db: Session, year: int, month: int) -> dict:
             s, e = max(c.start_date, start), min(c.end_date, end)
             for off in range((e - s).days + 1):
                 covered.add(s + timedelta(days=off))
+
+        # contracts of the month in different regions (contract A -> contract B): one
+        # analysed row per contract and region, cut exactly like the Calendrier
+        overlapping.sort(key=lambda c: (c.start_date, c.end_date))
+        cparts = contract_change_parts(db, bus, overlapping, periods_by_bus, start, end,
+                                       all_books, all_fuels)
+        if cparts is not None:
+            bks = books_by_bus.get(bus.id, [])
+            for k, q in enumerate(cparts):
+                p, s, res = q["p"], q["s"], q["res"]
+                if q["d_from"]:
+                    w_from = start.replace(day=q["d_from"])
+                    w_to = start.replace(day=q["d_to"])
+                else:                     # lies entirely in another month
+                    w_from, w_to = end + timedelta(days=1), end
+                seg_covered = len([d for d in q["cov"] if q["d_from"] and q["d_from"] <= d <= q["d_to"]])
+                st = _time_stats(bks, w_from, w_to)
+                revenue, loyer, fuel, net = p["revenue"], p["loyer"], p["fuel"], p["net"]
+                rows.append({
+                    "id": bus.id, "key": f"{bus.id}-{q['c'].id}-{q['i']}",
+                    "name": bus.name, "type": bus.type, "region": s["region"] or "—",
+                    "segment": {"region": s["region"], "index": k, "count": len(cparts),
+                                "from": p["from"], "to": p["to"], "days": p["days"],
+                                "moved_on": s["from"].isoformat() if k > 0 else None,
+                                "prorated": q["n"] > 1, "contract_change": True},
+                    "revenue": revenue, "loyer": loyer, "fuel": fuel, "net": net,
+                    "is_estimated": res["is_estimated"],
+                    "coverage": round(revenue / loyer * 100) if loyer > 0 else None,
+                    "covered_days": seg_covered,
+                    "day_occ": round(st["worked_days"] / seg_covered * 100) if seg_covered else 0,
+                    "time_complete": st["missing_time"] == 0,
+                    **st,
+                })
+            continue
 
         # result from the contract overlapping the month the most
         chosen, best = None, 0

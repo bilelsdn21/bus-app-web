@@ -21,9 +21,11 @@ def _contract_block(c, res) -> dict:
             "revenue": res["revenue"], "loyer": res["loyer"], "fuel": res["fuel"], "net": res["net"]}
 
 
-def _contract_change_rows(db, bus, overlapping, periods_by_bus, days, year, month, start, end,
+def contract_change_parts(db, bus, overlapping, periods_by_bus, start, end,
                           all_books, all_fuels) -> list[dict] | None:
-    """Rows for a vehicle whose contracts of the month are NOT all in one region.
+    """Parts (one per contract and region stretch) for a vehicle whose contracts of the
+    month are NOT all in one region. Shared by the Calendrier and the Analyse page, so
+    both always cut a month the same way.
 
     Typical case: contract A (Sousse) ends on the 12th, contract B (Djerba) starts on the
     13th. Each contract keeps its OWN result and its own region block, so nothing is
@@ -34,6 +36,8 @@ def _contract_change_rows(db, bus, overlapping, periods_by_bus, days, year, mont
     is stretched back to day 1, each row runs up to the day before the next one starts,
     the last to month end. Days between two contracts stay greyed (not covered) but are
     never lost. Returns None when the contracts stay in one region (legacy single row).
+    Each part carries: c (contract), res, p (its share), s (region stretch), n (stretches
+    of that contract), i, cov (contracted day numbers), d_from/d_to (display days, 0 = none).
     """
     plans = []
     for c in overlapping:
@@ -65,7 +69,15 @@ def _contract_change_rows(db, bus, overlapping, periods_by_bus, days, year, mont
     for q in parts:
         if q not in live or q["d_to"] < q["d_from"]:
             q["d_from"], q["d_to"] = 0, 0       # lies in another month: share shown, no days
+    return parts
 
+
+def _contract_change_rows(db, bus, overlapping, periods_by_bus, days, year, month, start, end,
+                          all_books, all_fuels) -> list[dict] | None:
+    """Calendrier rows built from contract_change_parts (None = legacy single row)."""
+    parts = contract_change_parts(db, bus, overlapping, periods_by_bus, start, end, all_books, all_fuels)
+    if parts is None:
+        return None
     rows = []
     for k, q in enumerate(parts):
         c, res, sg, pr = q["c"], q["res"], q["s"], q["p"]
