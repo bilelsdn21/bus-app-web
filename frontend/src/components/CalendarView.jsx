@@ -20,6 +20,15 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
   const [error, setError] = useState("");
   const [dests, setDests] = useState(() => api.peek.destinations() || []);
   const [editor, setEditor] = useState(null); // {bus, iso}
+  // phones get one card per vehicle (easy to read/tap); desktop keeps the wide table
+  const [view, setViewState] = useState(() => {
+    try {
+      const saved = localStorage.getItem("bus_calview");
+      if (saved === "cards" || saved === "table") return saved;
+    } catch {}
+    return typeof window !== "undefined" && window.matchMedia?.("(max-width: 639px)").matches ? "cards" : "table";
+  });
+  const setView = (v) => { setViewState(v); try { localStorage.setItem("bus_calview", v); } catch {} };
 
   const reload = () => {
     setError("");
@@ -74,7 +83,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
     const th = box.querySelector(`th[data-day="${todayDay}"]`);
     const first = box.querySelector("th");
     if (th && first) box.scrollLeft = Math.max(0, th.offsetLeft - first.offsetWidth - th.offsetWidth * 2);
-  }, [loading, data?.year, data?.month, todayDay]);
+  }, [loading, data?.year, data?.month, todayDay, view]);
 
   let region = null;
   const todayLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -113,6 +122,12 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
           </div>
           <button onClick={next} title="Mois suivant" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold shadow hover:bg-slate-50">→</button>
         </div>
+        <div className="flex rounded-lg bg-white p-0.5 text-xs font-semibold shadow ring-1 ring-slate-200" role="tablist" aria-label="Affichage">
+          {[["cards", "▦ Cartes"], ["table", "☰ Tableau"]].map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)}
+              className={`rounded-md px-3 py-2 transition ${view === k ? "bg-[#1a3a5c] text-white shadow" : "text-slate-500 hover:text-slate-800"}`}>{label}</button>
+          ))}
+        </div>
         <button onClick={exportExcel} disabled={exporting || !data}
           className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
           {exporting ? "Export…" : "⬇️ Exporter Excel"}
@@ -144,6 +159,14 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
 
       {data && !loading && data.buses.length > 0 && (
         <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {data.summary.regions.map((r) => <SummaryCard key={r.region} r={r} />)}
+            <SummaryCard r={data.summary.total} grand />
+          </div>
+
+          {view === "cards" ? (
+            <BusCards data={data} todayDay={todayDay} openDay={openDay} onOpenContract={onOpenContract} />
+          ) : (
           <div ref={scroller} className="scroll-x max-h-[72vh] overflow-auto rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
             <table className="w-full border-collapse text-xs">
               <thead>
@@ -249,11 +272,7 @@ export default function CalendarView({ year, month, setYear, setMonth, readOnly 
               </tbody>
             </table>
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            {data.summary.regions.map((r) => <SummaryCard key={r.region} r={r} />)}
-            <SummaryCard r={data.summary.total} grand />
-          </div>
+          )}
 
           {data.summary.shared > 0 && (
             <div className="rounded-xl bg-slate-50 px-4 py-3 text-[11px] text-slate-500 ring-1 ring-slate-200">
@@ -395,6 +414,83 @@ function CalendarSkeleton() {
       <div className="grid gap-3 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-slate-100" />)}
       </div>
+    </div>
+  );
+}
+
+
+// Phone-first view: one card per vehicle row with a compact month grid (Monday first).
+export function BusCards({ data, todayDay, openDay, onOpenContract }) {
+  const lead = (new Date(data.year, data.month - 1, 1).getDay() + 6) % 7;
+  let region = null;
+  return (
+    <div className="space-y-3">
+      {data.buses.map((bus) => {
+        const sep = bus.region !== region;
+        region = bus.region;
+        const seg = bus.segment;
+        const covered = bus.covered_days ? new Set(bus.covered_days) : null;
+        const net = bus.net;
+        return (
+          <Fragment key={bus.key || bus.id}>
+            {sep && (
+              <div className="sticky top-[58px] z-10 rounded-lg bg-sky-700 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white shadow">
+                {bus.region}
+              </div>
+            )}
+            <div className="rounded-2xl bg-white p-3 shadow ring-1 ring-slate-200">
+              <div className="flex items-start justify-between gap-3">
+                <button onClick={() => onOpenContract?.(bus.id)} className="min-w-0 text-left">
+                  <div className="truncate text-sm font-bold text-slate-700">{bus.name}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    <span>{bus.type}</span>
+                    {seg && (
+                      <span className="rounded bg-amber-100 px-1 py-px text-amber-700">
+                        {seg.index + 1}/{seg.count} · {seg.from.slice(8, 10)}/{seg.from.slice(5, 7)}→{seg.to.slice(8, 10)}/{seg.to.slice(5, 7)}
+                      </span>
+                    )}
+                    {bus.is_estimated && <span className="text-amber-500">est</span>}
+                  </div>
+                </button>
+                <div className="shrink-0 text-right">
+                  {net == null ? (
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-400">Pas de contrat</span>
+                  ) : (
+                    <>
+                      <span className={`rounded-md px-2 py-0.5 text-sm font-bold ${net >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>{fmtTND(net)}</span>
+                      <div className={`mt-0.5 text-[11px] font-semibold ${net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{bus.pct}</div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-7 gap-1 text-center">
+                {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
+                  <div key={i} className="text-[10px] font-semibold text-slate-400">{d}</div>
+                ))}
+                {Array.from({ length: lead }, (_, i) => <div key={`l${i}`} />)}
+                {Array.from({ length: data.days_in_month }, (_, i) => {
+                  const day = i + 1;
+                  const c = bus.days[day];
+                  const elsewhere = seg && (day < seg.day_from || day > seg.day_to);
+                  const out = elsewhere || (covered && !covered.has(day));
+                  const ring = day === todayDay ? "ring-2 ring-amber-400" : "";
+                  if (out && !c) {
+                    return <div key={day} className={`cell-out flex h-9 items-center justify-center rounded-lg text-[11px] text-slate-300 ${ring}`}>{day}</div>;
+                  }
+                  return (
+                    <button key={day} onClick={() => openDay(bus, day)} aria-label={`Jour ${day}`}
+                      className={`flex h-9 items-center justify-center rounded-lg text-[11px] font-semibold transition active:scale-90 ${ring} ${
+                        c ? `${DOT[c]?.bg || "bg-slate-300"} text-white shadow-sm` : "bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-200"}`}>
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

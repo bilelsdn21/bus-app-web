@@ -8,6 +8,7 @@ import JournalView from "./components/JournalView.jsx";
 import AnalyticsView from "./components/AnalyticsView.jsx";
 import Login from "./components/Login.jsx";
 import NotifyButton, { NotifyPrompt } from "./components/NotifyButton.jsx";
+import InstallBanner from "./components/InstallBanner.jsx";
 import Logo from "./components/Logo.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -84,6 +85,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-7xl px-3 py-4 pb-24 sm:px-4 sm:py-6 sm:pb-6">
+        <InstallBanner />
         <ErrorBoundary key={effMode}>
           <div className="animate-fadein">
             {effMode === "calendar" && <CalendarView year={year} month={month} setYear={setYear} setMonth={setMonth} readOnly={!isAdmin} username={auth.username} onOpenContract={openContract} />}
