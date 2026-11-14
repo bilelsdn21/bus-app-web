@@ -30,6 +30,27 @@ export default function App() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [contractBus, setContractBus] = useState(null); // bus to pre-open in Contrats
 
+  // phones: tables with class "stack" show one card per row; each cell is labelled with its
+  // column header (read from the <thead>, re-applied whenever the page content changes)
+  useEffect(() => {
+    const label = () => document.querySelectorAll("table.stack").forEach((t) => {
+      const heads = [...t.querySelectorAll("thead th")].map((h) => h.textContent.trim());
+      t.querySelectorAll("tbody tr").forEach((tr) => {
+        let i = 0;
+        [...tr.children].forEach((td) => {
+          const l = heads[i] || "";
+          if (td.dataset.label !== l) td.dataset.label = l;
+          i += td.colSpan || 1;
+        });
+      });
+    });
+    let raf = 0;
+    const obs = new MutationObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(label); });
+    obs.observe(document.body, { childList: true, subtree: true });
+    label();
+    return () => { obs.disconnect(); cancelAnimationFrame(raf); };
+  }, []);
+
   // drop the ?tab= query after using it so a manual refresh doesn't keep forcing the tab
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search) {

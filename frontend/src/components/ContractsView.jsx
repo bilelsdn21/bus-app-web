@@ -109,11 +109,11 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
               </div>
               <div className="flex gap-2">
                 {c.is_estimated && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Estimé</span>}
-                {!readOnly && <button onClick={() => setForm({ id: c.contract_id, start_date: c.start_date, end_date: c.end_date, loyer: c.loyer, label: c.label })} className="text-slate-400 hover:text-sky-600" title="Modifier">✎</button>}
-                {!readOnly && <button onClick={() => removeContract(c.contract_id)} className="text-slate-400 hover:text-rose-600" title="Supprimer">🗑</button>}
+                {!readOnly && <button onClick={() => setForm({ id: c.contract_id, start_date: c.start_date, end_date: c.end_date, loyer: c.loyer, label: c.label })} className="-m-1 p-2 text-lg text-slate-400 hover:text-sky-600" title="Modifier">✎</button>}
+                {!readOnly && <button onClick={() => removeContract(c.contract_id)} className="-m-1 p-2 text-lg text-slate-400 hover:text-rose-600" title="Supprimer">🗑</button>}
               </div>
             </div>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4 sm:gap-2">
               <Stat label="Revenu" value={fmtTND(c.revenue)} />
               <Stat label="Loyer" value={fmtTND(c.loyer)} neg />
               <Stat label="Carburant" value={fmtTND(c.fuel)} neg />
@@ -169,8 +169,8 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
       </div>
 
       {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setForm(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setForm(null)}>
+          <div className="safe-bottom max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-lg font-bold text-[#1a3a5c]">{form.id ? "Modifier" : "Nouveau"} contrat</h3>
             <div className="space-y-3">
               <L label="Libellé"><input className={inp} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="ex. Contrat Mai" /></L>

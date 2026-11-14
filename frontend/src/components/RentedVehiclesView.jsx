@@ -69,7 +69,7 @@ export default function RentedVehiclesView({ readOnly = false }) {
       {err && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{err}</div>}
 
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
-        <table className="w-full text-sm">
+        <table className="stack w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
             <th className="px-3 py-2">Nom</th><th className="px-2">Type</th><th className="px-2">Région</th><th className="px-2">Du</th><th className="px-2">Au</th>
             <th className="px-2 text-right">Coût</th><th className="px-2">Alternative dispo ?</th><th className="px-2">Notes</th>{!readOnly && <th></th>}
@@ -90,8 +90,8 @@ export default function RentedVehiclesView({ readOnly = false }) {
                 <td className="max-w-[160px] truncate px-2 py-2 text-slate-400">{r.notes}</td>
                 {!readOnly && (
                   <td className="whitespace-nowrap px-2 py-2 pr-3 text-right">
-                    <button onClick={() => setForm({ ...r })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
-                    <button onClick={() => del(r)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
+                    <button onClick={() => setForm({ ...r })} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-sky-600">✎</button>
+                    <button onClick={() => del(r)} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-rose-600">🗑</button>
                   </td>
                 )}
               </tr>
@@ -110,8 +110,8 @@ export default function RentedVehiclesView({ readOnly = false }) {
       </div>
 
       {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4" onClick={() => setForm(null)}>
-          <div className="w-full max-w-lg space-y-3 rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setForm(null)}>
+          <div className="safe-bottom max-h-[92vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-[#1a3a5c]">{form.id ? "Modifier" : "Nouveau"} véhicule loué</h3>
             <L label="Nom du véhicule"><input className={inp} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></L>
             <div className="grid grid-cols-3 gap-3">

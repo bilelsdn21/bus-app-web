@@ -12,7 +12,7 @@ export default function SettingsView({ readOnly = false }) {
         <h1 className="text-lg font-extrabold text-[#1a3a5c] sm:text-2xl">Paramètres</h1>
         {readOnly && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold uppercase text-slate-500">lecture seule</span>}
       </div>
-      <div className="flex flex-wrap gap-1 rounded-xl bg-slate-200 p-1 w-fit">
+      <div className="scroll-x -mx-3 flex gap-1 overflow-x-auto rounded-xl bg-slate-200 p-1 sm:mx-0 sm:w-fit sm:flex-wrap">
         <SubTab on={tab === "buses"} onClick={() => setTab("buses")}>🚌 Véhicules</SubTab>
         <SubTab on={tab === "dests"} onClick={() => setTab("dests")}>📍 Destinations</SubTab>
         <SubTab on={tab === "tarifs"} onClick={() => setTab("tarifs")}>💰 Tarifs antérieurs</SubTab>
@@ -152,7 +152,7 @@ function BusesPanel({ readOnly = false }) {
       </div>
 
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
-        <table className="w-full text-sm">
+        <table className="stack w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
             <th className="px-3 py-2">Nom</th><th>Type</th><th>Région</th>
             <th>Saisons</th><th>Activité</th>
@@ -188,8 +188,8 @@ function BusesPanel({ readOnly = false }) {
                 <td className="whitespace-nowrap text-right">{b.distance ? Number(b.distance).toLocaleString("fr-FR") + " km" : "—"}</td>
                 {!readOnly && (
                   <td className="whitespace-nowrap pr-3 text-right">
-                    <button onClick={() => setForm({ ...b, _region0: b.region })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
-                    <button onClick={() => del(b)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
+                    <button onClick={() => setForm({ ...b, _region0: b.region })} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-sky-600">✎</button>
+                    <button onClick={() => del(b)} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-rose-600">🗑</button>
                   </td>
                 )}
               </tr>
@@ -264,7 +264,7 @@ function DestsPanel({ readOnly = false }) {
         </button>
       </div>
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
-        <table className="w-full text-sm">
+        <table className="stack w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
             <th className="px-3 py-2">Catégorie</th><th>Destination</th><th className="text-right">MICRO</th><th className="text-right">OTOKAR</th><th className="text-right">BUS</th>{!readOnly && <th></th>}
           </tr></thead>
@@ -276,8 +276,8 @@ function DestsPanel({ readOnly = false }) {
                 <td className="text-right">{d.price_micro || "—"}</td><td className="text-right">{d.price_otokar || "—"}</td><td className="text-right">{d.price_bus || "—"}</td>
                 {!readOnly && (
                   <td className="whitespace-nowrap pr-3 text-right">
-                    <button onClick={() => setForm({ ...d })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
-                    <button onClick={() => del(d)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
+                    <button onClick={() => setForm({ ...d })} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-sky-600">✎</button>
+                    <button onClick={() => del(d)} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-rose-600">🗑</button>
                   </td>
                 )}
               </tr>
@@ -440,7 +440,7 @@ function PricePeriodsPanel({ readOnly = false }) {
         <p className="mb-2 text-xs text-slate-400">Remplissez <b>uniquement</b> les destinations dont le prix était différent — les autres gardent leur prix actuel. (Videz les 3 cases pour retirer une destination.)</p>
         <input placeholder="🔎 Rechercher une destination…" value={q} onChange={(e) => setQ(e.target.value)} className={inp + " mb-2 max-w-xs"} />
         <div className="overflow-x-auto rounded-xl ring-1 ring-slate-100">
-          <table className="w-full text-sm">
+          <table className="stack w-full text-sm">
             <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
               <th className="px-3 py-2">Destination</th>
               <th className="text-right">Actuel (M/O/B)</th>
@@ -568,7 +568,7 @@ function RegionPeriodsPanel({ readOnly = false }) {
       </div>
 
       <div className="overflow-x-auto rounded-2xl bg-white shadow ring-1 ring-slate-200">
-        <table className="w-full text-sm">
+        <table className="stack w-full text-sm">
           <thead><tr className="bg-slate-100 text-left text-xs text-slate-500">
             <th className="px-3 py-2">Du</th><th>Au</th><th>Région</th>{!readOnly && <th></th>}
           </tr></thead>
@@ -585,8 +585,8 @@ function RegionPeriodsPanel({ readOnly = false }) {
                 <td className="font-semibold text-slate-700">{p.region}</td>
                 {!readOnly && (
                   <td className="whitespace-nowrap pr-3 text-right">
-                    <button onClick={() => setForm({ id: p.id, effective_from: p.effective_from, effective_to: p.effective_to || "", region: p.region })} className="px-1 text-slate-400 hover:text-sky-600">✎</button>
-                    <button onClick={() => del(p)} className="px-1 text-slate-400 hover:text-rose-600">🗑</button>
+                    <button onClick={() => setForm({ id: p.id, effective_from: p.effective_from, effective_to: p.effective_to || "", region: p.region })} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-sky-600">✎</button>
+                    <button onClick={() => del(p)} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-rose-600">🗑</button>
                   </td>
                 )}
               </tr>
@@ -633,18 +633,18 @@ const btnPrimary = "rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-whi
 const L = ({ label, children }) => (<label className="block"><span className="mb-1 block text-xs font-semibold text-slate-500">{label}</span>{children}</label>);
 const Err = ({ msg }) => <div className="rounded-lg bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700">{msg}</div>;
 const SubTab = ({ on, onClick, children }) => (
-  <button onClick={onClick} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${on ? "bg-white text-[#1a3a5c] shadow" : "text-slate-500"}`}>{children}</button>
+  <button onClick={onClick} className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold ${on ? "bg-white text-[#1a3a5c] shadow" : "text-slate-500"}`}>{children}</button>
 );
 
 function Modal({ title, children, onClose, onSave, canSave }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="safe-bottom max-h-[92vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-[#1a3a5c]">{title}</h3>
         {children}
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100">Annuler</button>
-          <button onClick={onSave} disabled={!canSave} className="rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-white hover:bg-[#234d77] disabled:opacity-50">Enregistrer</button>
+          <button onClick={onClose} className="h-11 rounded-xl px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100">Annuler</button>
+          <button onClick={onSave} disabled={!canSave} className="h-11 rounded-xl bg-[#1a3a5c] px-5 py-2 text-sm font-bold text-white hover:bg-[#234d77] disabled:opacity-50">Enregistrer</button>
         </div>
       </div>
     </div>

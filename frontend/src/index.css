@@ -32,3 +32,25 @@ body { min-height: 100%; margin: 0; overscroll-behavior-y: none;
 .scroll-x { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 /* today's column in the calendar */
 .today-col { background-color: rgb(254 243 199 / .55); }
+
+/* ---- tables become one labelled card per row on phones (class "stack") ---- */
+@media (max-width: 639px) {
+  table.stack, .stack tbody, .stack tfoot, .stack tr, .stack td { display: block; width: 100%; }
+  .stack thead { display: none; }
+  .stack tr { padding: .65rem .9rem; border-top: 1px solid #e2e8f0; }
+  .stack tbody tr:first-child { border-top: 0; }
+  .stack td { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+              padding: .22rem 0 !important; text-align: right !important; max-width: none !important;
+              white-space: normal !important; }
+  .stack td::before { content: attr(data-label); flex-shrink: 0; text-align: left;
+              font-size: .68rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #94a3b8; }
+  .stack td:empty { display: none; }
+  .stack td[data-label=""]::before, .stack td[colspan]::before, .stack tfoot td::before { display: none; }
+  /* first cell = the card title (vehicle / destination / date) */
+  .stack tbody td:first-child { justify-content: flex-start; font-size: .95rem; padding-bottom: .4rem !important; }
+  .stack tbody td:first-child::before { display: none; }
+  .stack td[colspan] { justify-content: center; text-align: center !important; }
+  .stack tfoot tr { background: #f8fafc; border-top: 2px solid #e2e8f0; }
+  .stack td:last-child:has(button) { justify-content: flex-end; padding-top: .5rem !important; }
+  .stack td:last-child:has(button)::before { display: none; }
+}
