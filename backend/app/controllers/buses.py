@@ -27,7 +27,7 @@ def list_buses(db: Session = Depends(get_db)):
 def create_bus(body: schemas.BusCreate, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
     if db.query(models.Bus).filter(models.Bus.name == body.name).first():
         raise HTTPException(409, "Un véhicule avec ce nom existe déjà.")
-    bus = models.Bus(**{**body.model_dump(exclude={"region_effective_from"}),
+    bus = models.Bus(**{**body.model_dump(exclude={"region_effective_from", "region_effective_to"}),
                         "region": norm_region(body.region)})
     db.add(bus); db.flush()
     log_action(db, _admin, "Véhicule", f"Ajout : {bus.name}")
