@@ -248,7 +248,7 @@ page_break()
 
 # ================================================================== 1
 H1("1. Présentation du projet")
-callout("**24 fonctions sur 26** livrées (2 prévues) · **3 rôles** d'accès · **10 exports** Excel · **33 tests** automatiques · "
+callout("**28 fonctions sur 30** livrées (2 prévues) · **3 rôles** d'accès et une **console propriétaire** avec registre inaltérable · **10 exports** Excel · **44 tests** automatiques · "
         "calendrier chargé avec **8 requêtes au lieu de 52** · hébergement à **0 TND par mois** · installable sur téléphone (PWA).",
         fill="E0F2FE", bar="1A3A5C", title="L'essentiel en une phrase")
 H2("1.1 Contexte")
@@ -269,7 +269,7 @@ T(["Limite de l'ancien fonctionnement", "Conséquence"], [
 ], [8.3, 8.3])
 H2("1.3 Objectifs")
 T(["N°", "Objectif", "Indicateur de réussite"], [
-    ["O1", "Fiabiliser tous les calculs (source unique de vérité, intégrité des données)", "Aucune erreur d'affectation possible (clés étrangères) ; 33 tests automatiques au vert"],
+    ["O1", "Fiabiliser tous les calculs (source unique de vérité, intégrité des données)", "Aucune erreur d'affectation possible (clés étrangères) ; 44 tests automatiques au vert"],
     ["O2", "Rendre l'outil utilisable partout, surtout sur téléphone", "Application installable, vue « cartes » mobile, saisie d'un jour en quelques touchers"],
     ["O3", "Donner la rentabilité par véhicule, contrat et région, en temps réel", "Net, pourcentage et totaux régionaux affichés dès le chargement du calendrier"],
     ["O4", "Assurer la traçabilité et le contrôle des accès", "Journal d'activité complet ; trois niveaux de droits"],
@@ -329,6 +329,10 @@ F = [
  ["F22", "Application installable", "PWA : icône sur l'écran d'accueil, plein écran, consultation hors ligne des dernières données", "Should", "Réalisé"],
  ["F23", "Paramètres", "Seuils horaires matin / soir / nuit (13 h et 22 h par défaut), date d'application des prix actuels", "Should", "Réalisé"],
  ["F26", "Réaffectation de région sur une période", "Changer la région d'un véhicule pour n'importe quelle période, passée ou à venir (par exemple les deux derniers mois) : les périodes qui se chevauchent sont ajustées automatiquement, les sorties de ces jours suivent la région, les totaux se recalculent ; aperçu chiffré avant validation ; accessible depuis le formulaire du véhicule (date de fin optionnelle), le bouton 🗺️ de chaque véhicule et celui de chaque contrat", "Must", "Réalisé"],
+ ["F27", "Registre inaltérable des modifications", "Toute modification qui peut changer les chiffres (contrats et loyers, sorties et prix, carburant, régions, véhicules, tarifs, locations, paramètres) est enregistrée automatiquement et définitivement : qui (compte, rôle, adresse IP), quand, valeurs avant et après, mois concernés, caractère rétroactif. Les entrées sont chaînées par empreintes et la base refuse toute modification ou suppression", "Must", "Réalisé"],
+ ["F28", "Console propriétaire", "Écran réservé au propriétaire : vue d'ensemble (intégrité, modifications sensibles, écarts), registre filtrable avec détail avant / après, vérification de la chaîne, connexions et échecs, état du serveur et de la base, comptes et appareils notifiés, copie Excel du registre", "Must", "Réalisé"],
+ ["F29", "Alertes au propriétaire", "Notification sur le téléphone du propriétaire à chaque modification sensible faite par un autre compte (rétroactive, suppression, contrat, région, tarif) ; pastille sur l'onglet Console", "Should", "Réalisé"],
+ ["F30", "Instantanés et détection d'écarts", "Chaque jour, les chiffres affichés des 13 derniers mois sont figés ; si un chiffre d'un mois passé change sans modification enregistrée qui l'explique, l'écart est signalé « non expliqué » ; l'effet de chaque changement sensible sur les chiffres est mesuré avant / après", "Should", "Réalisé"],
  ["F24", "Gestion des comptes", "Création et modification des utilisateurs depuis l'interface", "Could", "Prévu"],
  ["F25", "Sauvegarde automatique", "Sauvegarde planifiée de la base (un script manuel existe)", "Should", "Prévu"],
 ]
@@ -387,6 +391,10 @@ P("« Djerba », « djerba » ou « Djerba » avec un espace en trop désignent 
 
 H3("R10 — Réaffectation d'une période")
 P("Une région peut être corrigée ou modifiée **pour n'importe quelle fenêtre de dates**, y compris dans le passé. Les périodes de région qui chevauchent la fenêtre sont **coupées, réduites ou supprimées** pour que la région de chaque jour reste unique, et les périodes voisines de même région sont fusionnées. Les sorties de ces jours suivent la nouvelle région, donc les totaux du Calendrier, de l'Analyse et des cartes régionales se recalculent aussitôt : l'argent ne disparaît pas, il change de région (le total de la flotte reste identique). Un **aperçu chiffré** (jours, sorties, TND déplacés, et d'où) est affiché avant validation, et chaque changement est inscrit au journal. Si la fenêtre contient la date du jour, la région actuelle du véhicule suit ; le reste du passé n'est jamais modifié.")
+H3("R11 — Rien ne se modifie sans trace")
+P("Les enregistrements du registre sont créés **dans la même transaction** que la modification : il est impossible de modifier une donnée suivie sans qu'une entrée soit enregistrée avec elle. Une modification est dite **rétroactive** si elle touche un mois déjà passé, et **sensible** si elle est rétroactive, supprime une donnée, ou concerne un contrat, une région, un tarif ou un véhicule. Enregistrer à nouveau une journée à l'identique n'est pas une modification. Les entrées ne sont jamais modifiées ni supprimées : chacune contient l'empreinte de la précédente, et la base de données refuse elle-même toute modification ou suppression.")
+H3("R12 — Les chiffres affichés sont figés et comparés")
+P("Les chiffres de chaque mois (par région, par véhicule, total) sont mesurés avant et après chaque changement sensible, puis figés chaque jour dans le registre. Quand un chiffre d'un mois passé a changé entre deux instantanés, on cherche les modifications enregistrées qui touchent ce mois : si aucune n'existe, l'écart est signalé **NON EXPLIQUÉ**, ce qui correspond à une modification faite en dehors de l'application.")
 H2("2.3 Besoins non fonctionnels")
 T(["Domaine", "Exigence", "Mise en œuvre / mesure"], [
     ["**Performance**", "Calendrier du mois affiché en 1 à 2 s en régime normal", "Chargement groupé : 52 requêtes SQL ramenées à 8 ; cache serveur ; réponses compressées ; cache navigateur avec affichage immédiat"],
@@ -394,7 +402,7 @@ T(["Domaine", "Exigence", "Mise en œuvre / mesure"], [
     ["**Sécurité**", "Accès contrôlé, données protégées", "Jeton signé et expirant, rôles contrôlés côté serveur, limitation des tentatives de connexion, HTTPS, en-têtes de sécurité, RLS sur la base (voir § 3.6)"],
     ["**Ergonomie mobile**", "Utilisable d'une main sur téléphone", "Barre d'onglets en bas, cartes par véhicule, boutons principaux d'au moins 44 px, zoom autorisé, champs en 16 px (pas de zoom automatique sur iPhone)"],
     ["**Compatibilité**", "Navigateurs et téléphones récents", "Chrome, Edge, Firefox, Safari récents ; Android ; iPhone (iOS 16.4 ou plus) pour les notifications, après ajout à l'écran d'accueil"],
-    ["**Maintenabilité**", "Code lisible et testé", "Architecture en couches (MVC), un seul module de calcul, 33 tests automatiques, documentation (README, guide de déploiement)"],
+    ["**Maintenabilité**", "Code lisible et testé", "Architecture en couches (MVC), un seul module de calcul, 44 tests automatiques, documentation (README, guide de déploiement)"],
     ["**Traçabilité**", "Savoir qui a fait quoi", "Journal d'activité de chaque ajout, modification, suppression, avec utilisateur et heure"],
     ["**Sobriété**", "Chargement léger sur réseau mobile", "Environ 75 Ko de code (compressé) ; aucune bibliothèque lourde"],
     ["**Portabilité**", "Développement local simple", "SQLite en local, PostgreSQL en production : même code, une variable d'environnement"],
@@ -438,6 +446,7 @@ T(["Table", "Contenu", "Remarque"], [
     ["rented_vehicles", "Locations externes de renfort", "Hors flotte : sans lien avec buses"],
     ["config", "Seuils horaires, date d'application des prix", "Ligne unique"],
     ["audit_log, push_subscriptions", "Journal des actions ; téléphones abonnés aux notifications", "—"],
+    ["ledger", "Registre des modifications, effets sur les chiffres et instantanés quotidiens", "Chaîné par empreintes ; jamais modifié ni supprimé"],
 ], [4.2, 7.4, 5.0], size=8.8)
 P("Données initiales migrées depuis l'ancien classeur : **23 véhicules**, **944 sorties**, **120 destinations**, ainsi que les contrats et le carburant.", size=10)
 H2("3.5 Interface de programmation (API)")
@@ -452,6 +461,7 @@ T(["Groupe", "Principales routes", "Accès"], [
     ["Exports", "GET /api/export/… (dix exports Excel)", "Connecté / administrateur"],
     ["Journal", "GET /api/audit (complet) · GET /api/audit/changes", "Propriétaire / administrateur"],
     ["Notifications", "/api/push/… · POST /api/notify/announce · /api/notify/test", "Connecté / administrateur"],
+    ["Console propriétaire", "/api/owner/overview · /ledger · /ledger/verify · /ledger/since · /drift · /snapshot · /export/ledger", "Propriétaire uniquement"],
     ["Supervision", "GET /api/health · GET /api/health/db", "Public (état du service)"],
 ], [3.4, 8.6, 4.6], size=8.8)
 H2("3.6 Sécurité")
@@ -463,8 +473,11 @@ T(["Mesure", "Détail"], [
     ["Base de données", "Sécurité au niveau des lignes (RLS) activée sur toutes les tables ; connexion chiffrée ; requêtes paramétrées via l'ORM"],
     ["Transport et navigateur", "HTTPS partout ; origines autorisées limitées (CORS) ; en-têtes de sécurité (nosniff, anti-framing, pas de référent)"],
     ["Erreurs", "Les erreurs inattendues renvoient un message lisible sans exposer d'adresse, d'identifiant ou de mot de passe"],
+    ["Registre inaltérable", "Enregistrement automatique de chaque modification (qui, quand, avant / après, impact sur les chiffres), chaînage par empreintes SHA-256, déclencheurs de base de données qui refusent toute modification ou suppression, vérification complète de la chaîne à la demande, instantanés quotidiens des chiffres"],
+    ["Alertes", "Le propriétaire reçoit une notification pour chaque modification sensible faite par un autre compte"],
     ["Traçabilité", "Journal de chaque ajout, modification, suppression et des connexions (visibles du propriétaire)"],
 ], [4.6, 12.0], size=8.8)
+callout("Le registre est **inaltérable pour l'application** et **infalsifiable sans que cela se voie** : quelqu'un qui disposerait d'un accès administrateur complet à la base de données pourrait en théorie désactiver les déclencheurs, mais il casserait la chaîne d'empreintes (détecté à la vérification), ferait apparaître un écart non expliqué dans les instantanés quotidiens, et la copie Excel conservée hors de l'application prouverait l'état antérieur. Pour une garantie maximale : exporter régulièrement le registre et en conserver l'empreinte.", title="Garanties et limites du registre")
 callout("Les comptes sont définis dans une variable d'environnement du serveur et les mots de passe n'y sont pas hachés. C'est acceptable pour une petite équipe, "
         "mais l'étape suivante est une table d'utilisateurs avec mots de passe hachés et une page de gestion (F24).", title="Amélioration de sécurité prévue")
 H2("3.7 Déploiement et exploitation")
@@ -514,13 +527,15 @@ T(["Écran", "Rôle", "Contenu"], [
 # ================================================================== 5
 H1("5. Qualité, tests et recette")
 H2("5.1 Tests automatiques")
-P("**33 tests** s'exécutent en quelques secondes sur une base temporaire (la vraie base n'est jamais touchée). Commande : **pytest** dans le dossier backend.")
+P("**44 tests** s'exécutent en quelques secondes sur une base temporaire (la vraie base n'est jamais touchée). Commande : **pytest** dans le dossier backend.")
 T(["Fichier", "Tests", "Ce qui est vérifié"], [
     ["test_calc.py", "6", "Carburant au prorata (exemple du § 2.2 au centime près), résultat estimé ou réel, recettes limitées au contrat, pourcentage, location sur deux mois, couleurs des jours"],
     ["test_regions.py", "11", "Écriture unique des noms de région, véhicule qui ne bouge pas, découpage exact au jour du déplacement, absence de faux déplacement dû à une faute de frappe"],
     ["test_calendar.py", "4", "Un seul bloc par région, une ligne par contrat en cas de changement de région, totaux régionaux = somme des loyers, véhicule sans contrat absent"],
     ["test_analytics.py", "2", "La page Analyse découpe le mois exactement comme le calendrier : mêmes lignes, mêmes montants (recette, loyer, carburant, net)"],
     ["test_region_assign.py", "9", "Réaffectation d'une période : découpage, réduction, suppression et fusion des périodes, fenêtre contenant aujourd'hui (le passé reste intact), aperçu exact sans écriture, totaux qui suivent la région"],
+    ["test_ledger.py", "9", "Registre : enregistrement automatique (qui, avant / après), chaîne vérifiée, modification et suppression détectées, base qui refuse de modifier le registre, drapeaux rétroactif / sensible, journée enregistrée à l'identique ignorée, effet mesuré sur les chiffres, écart non expliqué signalé, alerte au propriétaire (pas à lui-même)"],
+    ["test_buses_api.py", "2", "Création d'un véhicule et changement de région sur une période exacte"],
     ["test_cache.py", "1", "Le cache est vidé dès qu'une écriture a lieu : jamais de donnée périmée"],
 ], [3.4, 1.5, 11.7], size=8.8)
 H2("5.2 Cahier de recette (tests manuels)")
@@ -540,6 +555,9 @@ T(["N°", "Scénario", "Résultat attendu"], [
     ["R13", "Installer l'application, couper le réseau, rouvrir", "L'application s'ouvre et affiche les dernières données"],
     ["R14", "Changer de mois avec les flèches", "Mois voisins affichés instantanément"],
     ["R16", "Paramètres > Régions : « Changer sur une période », véhicule, région, « 2 derniers mois »", "Aperçu chiffré (jours, sorties, TND) ; après validation, le calendrier de ces deux mois montre le véhicule dans la nouvelle région et les totaux régionaux sont recalculés"],
+    ["R17", "Avec un compte administrateur, changer le loyer d'un contrat d'un mois passé", "Le propriétaire reçoit une notification ; la Console affiche l'entrée (qui, IP, avant / après, rétroactif) et l'effet sur le net du mois"],
+    ["R18", "Console > Intégrité > Vérifier maintenant", "Chaîne intacte ; l'empreinte de la dernière entrée est affichée ; la copie Excel du registre se télécharge"],
+    ["R19", "Tenter de modifier ou supprimer une ligne du registre directement dans la base", "La base refuse (« ledger is append-only »)"],
     ["R15", "Ouvrir Paramètres > Véhicules et Loués sur téléphone", "Une carte étiquetée par ligne, sans défilement horizontal ; formulaire en bas d'écran"],
 ], [1.2, 7.8, 7.6], size=8.8)
 
@@ -552,7 +570,7 @@ T(["Phase", "Contenu", "État"], [
     ["4 — Mise en ligne", "Base Supabase, API Render, interface Vercel, notifications push, application installable", "Réalisé"],
     ["5 — Optimisation", "Réduction des requêtes, cache, compression, déplacement de l'API à Francfort, robustesse aux réveils du serveur", "Réalisé"],
     ["6 — Mobile et finitions", "Barre d'onglets, vue cartes, tableaux en cartes, formulaires en bas d'écran, notifications accessibles, invitation à l'installation", "Réalisé"],
-    ["7 — Recette et documentation", "33 tests automatiques, cahier de recette, ce cahier des charges, guide de déploiement", "Réalisé"],
+    ["7 — Recette et documentation", "44 tests automatiques, cahier de recette, ce cahier des charges, guide de déploiement", "Réalisé"],
     ["8 — Évolutions", "Voir § 9", "Prévu"],
 ], [3.6, 10.6, 2.4], size=8.8, status_cols=(2,))
 
@@ -574,6 +592,8 @@ H1("8. Risques et limites connues")
 T(["Risque", "Probabilité", "Impact", "Parade"], [
     ["Mise en veille de l'API (démarrage à froid de 30 à 60 s)", "Moyenne", "Moyen", "Surveillance toutes les 5 min ; relances automatiques ; offre payante possible"],
     ["Projet Supabase gratuit mis en pause après inactivité", "Faible", "Fort", "Usage régulier ; réactivation en un clic ; sauvegarde à automatiser (F25)"],
+    ["Modification de données par un utilisateur pour fausser les chiffres affichés", "Moyenne", "Fort", "Registre inaltérable (qui, quand, avant / après), alerte au propriétaire, instantanés quotidiens et détection d'écarts non expliqués"],
+    ["Accès administrateur direct à la base qui contourne l'application", "Faible", "Fort", "Chaîne d'empreintes (détection), écart non expliqué dans les instantanés, copies Excel du registre conservées hors de l'application"],
     ["Perte de données", "Faible", "Fort", "Script de sauvegarde existant ; sauvegardes automatiques planifiées (F25) ou offre payante"],
     ["Comptes et mots de passe gérés côté serveur sans hachage", "Faible", "Moyen", "Passage à des comptes en base avec mots de passe hachés (F24)"],
     ["Mise à jour d'une dépendance qui casse le démarrage (déjà rencontré avec le pilote PostgreSQL)", "Moyenne", "Moyen", "Pilote désormais nommé explicitement ; tests automatiques ; versions à figer"],
@@ -595,11 +615,11 @@ H2("10.1 Livrables")
 B("Application en ligne : https://bus-app-web-lemon.vercel.app")
 B("Code source complet (interface, API, tests) : https://github.com/bilelsdn21/bus-app-web")
 B("Documentation : README (règles de calcul, architecture), guide de déploiement, ce cahier des charges")
-B("Suite de 33 tests automatiques et cahier de recette manuel (§ 5.2)")
+B("Suite de 44 tests automatiques et cahier de recette manuel (§ 5.2)")
 B("Exports Excel équivalents à l'ancien classeur")
 H2("10.2 Critères d'acceptation")
-B("Les 16 scénarios de recette (§ 5.2) sont validés")
-B("Les 33 tests automatiques passent")
+B("Les 19 scénarios de recette (§ 5.2) sont validés")
+B("Les 44 tests automatiques passent")
 B("Les totaux du calendrier, de l'export Excel et des cartes régionales concordent")
 B("Un utilisateur en lecture seule ne peut rien modifier, y compris en appelant l'API directement")
 B("Le calendrier d'un mois s'affiche en moins de 3 secondes sur une connexion mobile ordinaire (hors réveil du serveur)")
@@ -663,7 +683,7 @@ T(["Minutes", "Séquence", "Message clé"], [
     ["2 – 4", "Règles de gestion : prorata du carburant (exemple chiffré), régions datées", "La partie difficile est résolue et testée"],
     ["4 – 5", "Architecture : une image, trois services, coût nul", "Choix techniques justifiés"],
     ["5 – 9", "**Démonstration en direct** (scénario ci-dessous)", "L'outil fonctionne, sur téléphone aussi"],
-    ["9 – 10", "Qualité : 33 tests, sécurité, journal, mesures de performance (52 → 8 requêtes)", "Un projet fiable et rapide"],
+    ["9 – 10", "Qualité : 44 tests, sécurité, journal, mesures de performance (52 → 8 requêtes)", "Un projet fiable et rapide"],
     ["10 – 11", "Limites honnêtes et évolutions", "Maîtrise du sujet, vision"],
     ["11 – 12", "Conclusion et questions", "Valeur apportée"],
 ], [2.0, 8.4, 6.2], size=8.8)
