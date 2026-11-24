@@ -16,11 +16,13 @@ from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
 
 from .core.database import Base, engine
+from .core import ledger
+from .core.security import USERS, verify_token
 from .core.config import cors_origins
 from . import models  # noqa: F401  (import so tables register before create_all)
 from .controllers import (
     system, buses, destinations, config, contracts, fuel, calendar, excursions, days, push,
-    analytics, rentals, export,
+    analytics, rentals, export, owner,
 )
 
 Base.metadata.create_all(engine)
@@ -41,11 +43,19 @@ if engine.dialect.name == "postgresql":
     except Exception:
         pass  # never block startup on this
 
+ledger.install_guards(engine)      # the change register cannot be edited or deleted, even by a bug
+
 app = FastAPI(title="Bus Manager API")
 
 
 @app.middleware("http")
 async def security_headers(request, call_next):
+    # attribute every change made during this request to the signed-in user (and their address)
+    auth = request.headers.get("authorization") or ""
+    user = verify_token(auth[7:]) if auth.lower().startswith("bearer ") else None
+    fwd = request.headers.get("x-forwarded-for")
+    ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "")
+    actor_token = ledger.set_actor(user or "(anonyme)", USERS.get(user, {}).get("role", "") if user else "", ip)
     try:
         resp = await call_next(request)
     except Exception as e:
@@ -57,6 +67,7 @@ async def security_headers(request, call_next):
                                                  request.method, request.url.path, traceback.format_exc())
         first = (str(getattr(e, "orig", e)).strip().splitlines() or [""])[0][:200]
         resp = JSONResponse({"detail": f"Erreur serveur ({type(e).__name__}) {first}".strip()}, status_code=500)
+    ledger.reset_actor(actor_token)
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "no-referrer"
@@ -81,6 +92,6 @@ app.add_middleware(
 for router in (
     system.router, buses.router, destinations.router, config.router,
     contracts.router, fuel.router, calendar.router, excursions.router, days.router,
-    push.router, analytics.router, rentals.router, export.router,
+    push.router, analytics.router, rentals.router, export.router, owner.router,
 ):
     app.include_router(router)

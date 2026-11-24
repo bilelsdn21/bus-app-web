@@ -15,6 +15,9 @@ router = APIRouter()
 
 @router.api_route("/api/health", methods=["GET", "HEAD"])   # uptime monitors usually send HEAD
 def health():
+    # the uptime monitor calls this every few minutes: use it to keep the daily snapshot of the numbers fresh
+    from ..services import integrity
+    integrity.maybe_snapshot_async()
     return {"ok": True}
 
 

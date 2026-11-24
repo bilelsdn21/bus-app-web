@@ -56,12 +56,15 @@ def build_month_summary(db: Session):
     return f"📊 Résumé {data['label']}", " • ".join(parts)
 
 
-def send_to_all(db: Session, title: str, body: str, url: str = "/") -> dict:
-    """Send a notification to every stored subscription. Prunes dead ones."""
+def send_to_all(db: Session, title: str, body: str, url: str = "/", only_users=None) -> dict:
+    """Send a notification to every stored subscription (or only those of `only_users`). Prunes dead ones."""
     from pywebpush import webpush, WebPushException
     if not (VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY):
         return {"error": "VAPID keys not configured", "sent": 0}
-    subs = db.query(models.PushSubscription).all()
+    q = db.query(models.PushSubscription)
+    if only_users is not None:
+        q = q.filter(models.PushSubscription.username.in_(list(only_users)))
+    subs = q.all()
     payload = json.dumps({"title": title, "body": body, "url": url})
     sent = pruned = failed = 0
     for s in subs:
@@ -82,3 +85,18 @@ def send_to_all(db: Session, title: str, body: str, url: str = "/") -> dict:
     if pruned:
         db.commit()
     return {"sent": sent, "pruned": pruned, "failed": failed, "total": len(subs)}
+
+
+_last_user_push: dict = {}
+
+
+def send_to_users(db: Session, usernames, title: str, body: str, url: str = "/", min_gap: int = 45) -> dict:
+    """Notify only these accounts' phones (e.g. the owner). At most one alert per `min_gap` seconds
+    for the same title, so a burst of edits does not flood the phone (every edit stays in the register)."""
+    import time
+    key = (tuple(sorted(usernames)), title)
+    now = time.time()
+    if now - _last_user_push.get(key, 0) < min_gap:
+        return {"skipped": "throttled"}
+    _last_user_push[key] = now
+    return send_to_all(db, title, body, url=url, only_users=usernames)

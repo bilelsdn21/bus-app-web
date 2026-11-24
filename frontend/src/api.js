@@ -115,7 +115,7 @@ async function attempt(path, opts, isGet) {
     throw new Error(msg);
   }
   const data = res.status === 204 ? null : await res.json();
-  if (isGet) remember(path, data);
+  if (isGet && !opts.nocache) remember(path, data);   // owner data is never kept locally
   return data;
 }
 
@@ -203,6 +203,14 @@ export const api = {
   pushKey: () => req(`/api/push/key`),
   pushSubscribe: (sub) => req(`/api/push/subscribe`, { method: "POST", body: JSON.stringify(sub) }),
   pushUnsubscribe: (sub) => req(`/api/push/unsubscribe`, { method: "POST", body: JSON.stringify(sub) }),
+  // owner console (owner-only on the server; never cached in the browser)
+  ownerOverview: () => req(`/api/owner/overview`, { nocache: true }),
+  ownerLedger: (p) => req(`/api/owner/ledger?${new URLSearchParams(p)}`, { nocache: true }),
+  ownerSince: (id) => req(`/api/owner/ledger/since?id=${id}`, { nocache: true }),
+  ownerVerify: () => req(`/api/owner/ledger/verify`, { nocache: true }),
+  ownerDrift: (live) => req(`/api/owner/drift?live=${live ? 1 : 0}`, { nocache: true }),
+  ownerSnapshot: () => req(`/api/owner/snapshot`, { method: "POST", nocache: true }),
+  exportLedger: () => reqBlob(`/api/owner/export/ledger`),
   notifyTest: () => req(`/api/notify/test`, { method: "POST" }),
   announce: (p) => req(`/api/notify/announce`, { method: "POST", body: JSON.stringify(p) }),
 };

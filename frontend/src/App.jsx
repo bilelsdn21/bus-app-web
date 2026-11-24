@@ -9,6 +9,7 @@ import AnalyticsView from "./components/AnalyticsView.jsx";
 import Login from "./components/Login.jsx";
 import NotifyButton, { NotifyPrompt } from "./components/NotifyButton.jsx";
 import InstallBanner from "./components/InstallBanner.jsx";
+import OwnerConsole from "./components/OwnerConsole.jsx";
 import Logo from "./components/Logo.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -29,6 +30,26 @@ export default function App() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [contractBus, setContractBus] = useState(null); // bus to pre-open in Contrats
+
+  // owner: number of sensitive changes since the Console was last opened (badge on its tab)
+  const [consoleBadge, setConsoleBadge] = useState(0);
+  const seenKey = "bus_console_seen";
+  const markSeen = (id) => { try { localStorage.setItem(seenKey, String(id)); } catch {} setConsoleBadge(0); };
+  useEffect(() => {
+    if (!isOwner) return;
+    const poll = () => {
+      let seen = null;
+      try { seen = localStorage.getItem(seenKey); } catch {}
+      api.ownerSince(Number(seen || 0)).then((r) => {
+        if (seen === null) markSeen(r.head_id);          // first visit: start counting from now
+        else setConsoleBadge(r.sensitive);
+      }).catch(() => {});
+    };
+    poll();
+    const t = setInterval(poll, 60000);
+    window.addEventListener("focus", poll);
+    return () => { clearInterval(t); window.removeEventListener("focus", poll); };
+  }, [isOwner]);
 
   // phones: tables with class "stack" show one card per row; each cell is labelled with its
   // column header (read from the <thead>, re-applied whenever the page content changes)
@@ -70,6 +91,8 @@ export default function App() {
     ? [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["rentals", "🚐 Loués"], ["analytics", "📈 Analyse"], ["settings", "⚙️ Params"],
        ["journal", "🧾 Journal"]]
     : [["calendar", "📊 Calendrier"], ["contracts", "📄 Contrats"], ["rentals", "🚐 Loués"], ["settings", "⚙️ Params"]];
+  if (isOwner) tabs.push(["console", "🛰️ Console"]);
+  const badge = (key) => (key === "console" && consoleBadge > 0 ? consoleBadge : 0);
 
   // if a viewer somehow has an admin-only mode selected, fall back to calendar
   const effMode = tabs.some(([k]) => k === mode) ? mode : "calendar";
@@ -89,7 +112,7 @@ export default function App() {
           </div>
           <nav className="hidden flex-wrap gap-1 rounded-xl bg-white/10 p-1 sm:flex">
             {tabs.map(([key, label]) => (
-              <Tab key={key} on={effMode === key} onClick={() => setMode(key)}>{label}</Tab>
+              <Tab key={key} on={effMode === key} onClick={() => setMode(key)}>{label}{badge(key) > 0 && <span className="ml-1.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{badge(key)}</span>}</Tab>
             ))}
           </nav>
           <div className="flex shrink-0 items-center gap-1">
@@ -115,6 +138,7 @@ export default function App() {
             {effMode === "analytics" && <AnalyticsView year={year} month={month} setYear={setYear} setMonth={setMonth} />}
             {effMode === "settings" && <SettingsView readOnly={!isAdmin} />}
             {effMode === "journal" && <JournalView full={isOwner} />}
+            {effMode === "console" && <OwnerConsole onSeen={markSeen} />}
           </div>
         </ErrorBoundary>
       </main>
@@ -131,7 +155,7 @@ export default function App() {
               <button key={key} onClick={() => { setMode(key); window.scrollTo({ top: 0 }); }}
                 aria-current={on ? "page" : undefined}
                 className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 pb-1.5 pt-2 text-[10px] font-semibold transition ${on ? "text-amber-300" : "text-white/60 active:text-white"}`}>
-                <span className={`text-lg leading-none ${on ? "" : "opacity-80"}`}>{icon}</span>
+                <span className={`relative text-lg leading-none ${on ? "" : "opacity-80"}`}>{icon}{badge(key) > 0 && <span className="absolute -right-2.5 -top-1.5 min-w-[16px] rounded-full bg-rose-500 px-1 text-[9px] font-bold leading-4 text-white">{badge(key)}</span>}</span>
                 <span className="w-full truncate text-center">{rest.join(" ")}</span>
                 {on && <span className="mt-0.5 h-0.5 w-6 rounded-full bg-amber-300" />}
               </button>

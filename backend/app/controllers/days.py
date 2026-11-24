@@ -64,9 +64,11 @@ def save_day(body: schemas.DaySave, db: Session = Depends(get_db), _admin: str =
                 "Créez d'abord un contrat (onglet Contrats) couvrant cette période.")
 
     # replace all existing rows for this bus+date (same semantics as Excel SaveAndReturn)
-    db.query(models.Booking).filter(
-        models.Booking.bus_id == bus.id, models.Booking.date == body.date
-    ).delete()
+    # (row by row, not a bulk DELETE: the change register records every removed row)
+    for old in db.query(models.Booking).filter(
+            models.Booking.bus_id == bus.id, models.Booking.date == body.date).all():
+        db.delete(old)
+    db.flush()
 
     saved = 0
     for row in body.rows:

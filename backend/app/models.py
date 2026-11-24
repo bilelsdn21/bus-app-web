@@ -4,7 +4,7 @@ references a bus by FK (id) — no more silent name-mismatch lost revenue.
 """
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, UniqueConstraint
+    Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, UniqueConstraint, Boolean
 )
 from sqlalchemy.orm import relationship
 from .core.database import Base
@@ -157,3 +157,31 @@ class PushSubscription(Base):
     auth       = Column(String, nullable=False)
     username   = Column(String, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LedgerEntry(Base):
+    """Append-only, hash-chained register of every change that can move the numbers, of their
+    measured impact, and of periodic snapshots of the numbers.
+
+    Rows are never updated or deleted (database triggers refuse it). Each row stores the hash
+    of the previous one, so altering, removing or inserting any row breaks the chain and is
+    detected by core.ledger.verify_chain()."""
+    __tablename__ = "ledger"
+    id         = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, nullable=False, index=True)    # UTC, whole seconds
+    batch      = Column(String, index=True)       # all entries written by one save share it
+    kind       = Column(String, default="change", index=True)   # change | impact | snapshot
+    actor      = Column(String, index=True)
+    role       = Column(String, default="")
+    ip         = Column(String, default="")
+    action     = Column(String, default="")       # create | update | delete | snapshot
+    entity     = Column(String, index=True, default="")   # contract | booking | fuel | region | ...
+    entity_id  = Column(Integer)
+    bus_id     = Column(Integer, index=True)
+    bus_name   = Column(String, default="")
+    summary    = Column(Text, default="")
+    data       = Column(Text, default="")         # JSON: before / after / months / impact / snapshot
+    retroactive = Column(Boolean, default=False, index=True)   # touches a month already past
+    sensitive  = Column(Boolean, default=False, index=True)    # the owner is alerted
+    prev_hash  = Column(String, default="")
+    hash       = Column(String, nullable=False, index=True)

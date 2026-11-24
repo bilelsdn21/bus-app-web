@@ -133,7 +133,12 @@ def region_order(r: str) -> int:
 
 
 def run():
-    Base.metadata.drop_all(engine)
+    # A re-import rewrites everything: do not flood the register with one entry per row (and do not
+    # measure impact for each). Switch per-row capture off and record ONE clearly labelled entry instead.
+    from .core import ledger
+    ledger.ENABLED = False
+    # the ledger is the permanent record: a re-seed must never erase it
+    Base.metadata.drop_all(engine, tables=[t for t in Base.metadata.sorted_tables if t.name != "ledger"])
     Base.metadata.create_all(engine)
     db = SessionLocal()
 
@@ -225,6 +230,14 @@ def run():
     print(f"Seeded {len(bus_by_plate)} buses ({n_extra} extra from bookings), {n_book} bookings, "
           f"{n_dest} destinations, {n_contract} contracts, {n_fuel} fuel-months. "
           f"Cutoffs {cut_morn}/{cut_night}.")
+    ledger.install_guards(engine)
+    ledger.append_entry(
+        db, kind="change", actor="import des données (seed)", role="", ip="", action="create", entity="numbers",
+        summary=(f"RÉIMPORT COMPLET des données : {len(bus_by_plate)} véhicules, {n_book} sorties, {n_contract} contrats, "
+                 f"{n_fuel} lignes de carburant. La base a été réinitialisée ; le registre est conservé."),
+        data={"before": None, "after": {"vehicules": len(bus_by_plate), "sorties": n_book, "contrats": n_contract}, "months": []},
+        retroactive=True, sensitive=True)
+    db.commit()
     db.close()
 
 
