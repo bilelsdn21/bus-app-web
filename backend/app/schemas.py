@@ -18,6 +18,9 @@ class BusCreate(BusBase):
     # the move date is required: the API records it as a dated period instead of
     # silently re-attributing every past month (see controllers/buses.py).
     region_effective_from: Optional[date] = None
+    # Optional END of that window: with it the change is "from .. to .." only (the vehicle then
+    # keeps the region it had); without it the vehicle moves for good from the start date.
+    region_effective_to: Optional[date] = None
 
 class BusOut(BusBase):
     model_config = ConfigDict(from_attributes=True)

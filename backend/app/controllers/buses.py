@@ -58,9 +58,18 @@ def update_bus(bus_id: int, body: schemas.BusCreate, db: Session = Depends(get_d
                                  "indiquez la date du changement de région, pour que les mois déjà "
                                  "enregistrés gardent la leur.")
 
-    for k, v in body.model_dump(exclude={"region_effective_from", "region"}).items():
+    if body.region_effective_to is not None:
+        if not body.region_effective_from:
+            raise HTTPException(422, "Indiquez aussi la date de début de la période.")
+        if body.region_effective_to < body.region_effective_from:
+            raise HTTPException(422, "La date de fin est antérieure à la date de début.")
+
+    for k, v in body.model_dump(exclude={"region_effective_from", "region_effective_to", "region"}).items():
         setattr(bus, k, v)
-    if moving and has_history:
+    if moving and body.region_effective_from and body.region_effective_to:
+        # an exact window (from .. to): the same tool as "Changer sur une période"
+        assign_region_range(db, bus, body.region, body.region_effective_from, body.region_effective_to, _admin)
+    elif moving and has_history:
         record_move(db, bus, body.region, body.region_effective_from, _admin)
     else:
         bus.region = norm_region(body.region)

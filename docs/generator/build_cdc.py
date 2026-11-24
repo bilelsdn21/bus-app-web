@@ -328,7 +328,7 @@ F = [
  ["F21", "Notifications push", "Abonnement par téléphone ; annonces envoyées par un administrateur ; résumé du mois", "Should", "Réalisé"],
  ["F22", "Application installable", "PWA : icône sur l'écran d'accueil, plein écran, consultation hors ligne des dernières données", "Should", "Réalisé"],
  ["F23", "Paramètres", "Seuils horaires matin / soir / nuit (13 h et 22 h par défaut), date d'application des prix actuels", "Should", "Réalisé"],
- ["F26", "Réaffectation de région sur une période", "Changer la région d'un véhicule pour n'importe quelle période, passée ou à venir (par exemple les deux derniers mois) : les périodes qui se chevauchent sont ajustées automatiquement, les sorties de ces jours suivent la région, les totaux se recalculent ; aperçu chiffré avant validation ; accessible depuis les Paramètres et depuis chaque contrat", "Must", "Réalisé"],
+ ["F26", "Réaffectation de région sur une période", "Changer la région d'un véhicule pour n'importe quelle période, passée ou à venir (par exemple les deux derniers mois) : les périodes qui se chevauchent sont ajustées automatiquement, les sorties de ces jours suivent la région, les totaux se recalculent ; aperçu chiffré avant validation ; accessible depuis le formulaire du véhicule (date de fin optionnelle), le bouton 🗺️ de chaque véhicule et celui de chaque contrat", "Must", "Réalisé"],
  ["F24", "Gestion des comptes", "Création et modification des utilisateurs depuis l'interface", "Could", "Prévu"],
  ["F25", "Sauvegarde automatique", "Sauvegarde planifiée de la base (un script manuel existe)", "Should", "Prévu"],
 ]

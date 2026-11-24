@@ -34,6 +34,7 @@ const BLANK_FILTERS = { q: "", type: "", region: "", year: "", history: "", sort
 function BusesPanel({ readOnly = false }) {
   const [buses, setBuses] = useState([]);
   const [form, setForm] = useState(null);
+  const [assignBus, setAssignBus] = useState(null); // vehicle whose region is changed over an exact period
   const [err, setErr] = useState("");
   const [exporting, setExporting] = useState(false);
   const [f, setF] = useState(BLANK_FILTERS);
@@ -56,7 +57,9 @@ function BusesPanel({ readOnly = false }) {
         distance: Number(form.distance) || 0, plate: form.plate || "",
         // a region change on an existing vehicle is a dated MOVE: the API refuses it
         // without a date so past months keep the region they were worked in
-        region_effective_from: form.region_effective_from || null };
+        // only when the region really changed (dates typed before changing it back are ignored)
+        region_effective_from: (form.id && form.region !== form._region0 && form.region_effective_from) || null,
+        region_effective_to: (form.id && form.region !== form._region0 && form.region_effective_to) || null };
       if (form.id) await api.updateBus(form.id, p); else await api.createBus(p);
       setForm(null); load();
     } catch (e) { setErr(e.message); }
@@ -189,6 +192,7 @@ function BusesPanel({ readOnly = false }) {
                 <td className="whitespace-nowrap text-right">{b.distance ? Number(b.distance).toLocaleString("fr-FR") + " km" : "—"}</td>
                 {!readOnly && (
                   <td className="whitespace-nowrap pr-3 text-right">
+                    <button onClick={() => setAssignBus(b)} title="Changer la région sur une période précise" aria-label="Changer la région sur une période" className="px-2.5 py-1.5 text-base text-slate-400 hover:text-amber-600">🗺️</button>
                     <button onClick={() => setForm({ ...b, _region0: b.region })} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-sky-600">✎</button>
                     <button onClick={() => del(b)} className="px-2.5 py-1.5 text-base text-slate-400 hover:text-rose-600">🗑</button>
                   </td>
@@ -198,6 +202,10 @@ function BusesPanel({ readOnly = false }) {
           </tbody>
         </table>
       </div>
+      {assignBus && (
+        <RegionAssignModal buses={buses} bus={assignBus} onClose={() => setAssignBus(null)}
+          onDone={() => { setAssignBus(null); load(); }} />
+      )}
       {form && (() => {
         const moving = !!form.id && form.region !== form._region0;
         return (
@@ -210,13 +218,21 @@ function BusesPanel({ readOnly = false }) {
             </div>
             {moving && (
               <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
-                <L label={`Date du déplacement vers ${form.region} (obligatoire)`}>
-                  <input type="date" className={inp} value={form.region_effective_from || ""}
-                         onChange={(e) => setForm({ ...form, region_effective_from: e.target.value })} />
-                </L>
+                <div className="grid grid-cols-2 gap-3">
+                  <L label={`Du (obligatoire)`}>
+                    <input type="date" className={inp} value={form.region_effective_from || ""}
+                           onChange={(e) => setForm({ ...form, region_effective_from: e.target.value })} />
+                  </L>
+                  <L label="Au (optionnel)">
+                    <input type="date" className={inp} value={form.region_effective_to || ""}
+                           onChange={(e) => setForm({ ...form, region_effective_to: e.target.value })} />
+                  </L>
+                </div>
                 <p className="mt-2 text-[11px] text-amber-700">
-                  Tout ce qui a été fait avant cette date reste à <b>{form._region0 || "—"}</b> et n'est pas recalculé.
-                  Le mois du déplacement s'affichera en deux lignes, une par région.
+                  {form.region_effective_to
+                    ? <>Le véhicule est à <b>{form.region}</b> <b>seulement</b> du {form.region_effective_from || "…"} au {form.region_effective_to} ; avant et après, il garde sa région. Les sorties de ces jours suivent la région.</>
+                    : <>Sans date de fin, le véhicule est à <b>{form.region}</b> à partir de cette date. Tout ce qui a été fait avant reste à <b>{form._region0 || "—"}</b>. Le mois du déplacement s'affichera en deux lignes, une par région.</>}
+                  {" "}Pour voir l'impact chiffré avant de valider, utilisez plutôt le bouton <b>🗺️</b> de la ligne du véhicule.
                 </p>
               </div>
             )}
