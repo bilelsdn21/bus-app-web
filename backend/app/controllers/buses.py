@@ -10,79 +10,12 @@ from .. import models, schemas
 from ..services.audit import log_action
 from ..services.fleet import fleet_overview
 from ..services.lookups import norm_region
+from ..services.regions import (
+    record_move, assign_region_range, preview_assign, MAX_SPAN_DAYS,
+)
 
 # Reads require a signed-in account; writes add require_admin on top.
 router = APIRouter(dependencies=[Depends(require_user)])
-
-
-def _uncovered_ranges(periods, first: date, last: date) -> list[tuple[date, date]]:
-    """The stretches of [first..last] that NO period covers.
-
-    Those are exactly the days whose region silently falls back to the bus's `region`
-    field — i.e. the days a future move would re-attribute. Returned so they can be
-    pinned down before the move happens."""
-    gaps, cur = [], first
-    for p in sorted(periods, key=lambda p: p.effective_from):
-        p_end = p.effective_to or date.max
-        if p_end < cur:
-            continue                       # entirely behind us
-        if p.effective_from > cur:
-            gaps.append((cur, min(p.effective_from - timedelta(days=1), last)))
-        if p_end >= last:
-            break                          # the rest of the window is covered
-        cur = p_end + timedelta(days=1)
-    else:
-        if cur <= last:
-            gaps.append((cur, last))
-    return [(a, b) for a, b in gaps if a <= b]
-
-
-def _first_known_day(db: Session, bus: models.Bus, periods) -> date | None:
-    """The vehicle's earliest day on file — first trip, first contract, or first region
-    period, whichever comes first. Everything from there on is history to protect."""
-    firsts = [
-        db.query(func.min(models.Booking.date)).filter(models.Booking.bus_id == bus.id).scalar(),
-        db.query(func.min(models.Contract.start_date)).filter(models.Contract.bus_id == bus.id).scalar(),
-        min((p.effective_from for p in periods), default=None),
-    ]
-    firsts = [d for d in firsts if d]
-    return min(firsts) if firsts else None
-
-
-def _record_move(db: Session, bus: models.Bus, region: str, moved_on: date, admin: str) -> models.BusRegionPeriod:
-    """Record a region move: close what the vehicle was in the day BEFORE, open the new
-    period from `moved_on`.
-
-    This is the single writer of region history. Everything the vehicle did before
-    `moved_on` keeps the region it had then, only the days from `moved_on` on get the
-    new one — a region change can never re-attribute a past month's figures."""
-    region = norm_region(region)
-    prev_day = moved_on - timedelta(days=1)
-    periods = db.query(models.BusRegionPeriod).filter(models.BusRegionPeriod.bus_id == bus.id).all()
-
-    # Pin down EVERY past day that no period covers, with the region the vehicle is
-    # LEAVING — otherwise those days keep falling back to `bus.region`, which is about
-    # to become the new region, and the past silently moves with it.
-    # All the holes are filled, not just the one right before the move: history entered
-    # month by month leaves gaps everywhere, and any one of them would flip.
-    first_known = _first_known_day(db, bus, periods)
-    if first_known and norm_region(bus.region):
-        for gap_from, gap_to in _uncovered_ranges(periods, first_known, prev_day):
-            db.add(models.BusRegionPeriod(bus_id=bus.id, region=norm_region(bus.region),
-                                          effective_from=gap_from, effective_to=gap_to))
-
-    for p in periods:                       # nothing may stay open across the move date
-        if p.effective_to is None or p.effective_to >= moved_on:
-            if p.effective_from < moved_on:
-                p.effective_to = prev_day
-            else:
-                db.delete(p)                # a later period is superseded by this move
-
-    rp = models.BusRegionPeriod(bus_id=bus.id, region=region, effective_from=moved_on, effective_to=None)
-    db.add(rp)
-    bus.region = region                     # the `region` field only means "where it is now"
-    log_action(db, admin, "Région période", f"{bus.name} → {region} dès le {moved_on.isoformat()}")
-    return rp
 
 
 @router.get("/api/buses", response_model=list[schemas.BusOut])
@@ -128,7 +61,7 @@ def update_bus(bus_id: int, body: schemas.BusCreate, db: Session = Depends(get_d
     for k, v in body.model_dump(exclude={"region_effective_from", "region"}).items():
         setattr(bus, k, v)
     if moving and has_history:
-        _record_move(db, bus, body.region, body.region_effective_from, _admin)
+        record_move(db, bus, body.region, body.region_effective_from, _admin)
     else:
         bus.region = norm_region(body.region)
     log_action(db, _admin, "Véhicule", f"Modification : {bus.name}")
@@ -167,9 +100,38 @@ def move_region(body: schemas.RegionMoveIn, db: Session = Depends(get_db), _admi
         raise HTTPException(404, "Véhicule introuvable.")
     if not norm_region(body.region):
         raise HTTPException(422, "Région manquante.")
-    rp = _record_move(db, bus, norm_region(body.region), body.moved_on, _admin)
+    rp = record_move(db, bus, norm_region(body.region), body.moved_on, _admin)
     db.commit(); db.refresh(rp)
     return rp
+
+
+@router.post("/api/region-periods/assign")
+def assign_region(body: schemas.RegionAssignIn, db: Session = Depends(get_db), _admin: str = Depends(require_admin)):
+    """"The vehicle was in <region> between these two dates" — for ANY window, past or future.
+
+    Overlapping periods are trimmed/split/removed automatically, and the trips and money of
+    those days follow the region: the Calendrier, Analyse and regional totals recompute at
+    once. With `preview=true` nothing is written; it reports how many days, trips and TND
+    would move and from where, so the change can be checked before it is applied."""
+    bus = db.get(models.Bus, body.bus_id)
+    if not bus:
+        raise HTTPException(404, "Véhicule introuvable.")
+    region = norm_region(body.region)
+    if not region:
+        raise HTTPException(422, "Région manquante.")
+    if body.date_to is not None:
+        if body.date_to < body.date_from:
+            raise HTTPException(422, "La date de fin est antérieure à la date de début.")
+        if (body.date_to - body.date_from).days > MAX_SPAN_DAYS:
+            raise HTTPException(422, "Période trop longue (10 ans maximum).")
+    if body.preview:
+        return preview_assign(db, bus, region, body.date_from, body.date_to)
+    assign_region_range(db, bus, region, body.date_from, body.date_to, _admin)
+    db.commit()
+    periods = (db.query(models.BusRegionPeriod).filter(models.BusRegionPeriod.bus_id == bus.id)
+               .order_by(models.BusRegionPeriod.effective_from.desc()).all())
+    return {"ok": True, "region": region,
+            "periods": [schemas.RegionPeriodOut.model_validate(p).model_dump(mode="json") for p in periods]}
 
 
 @router.put("/api/region-periods", response_model=schemas.RegionPeriodOut)

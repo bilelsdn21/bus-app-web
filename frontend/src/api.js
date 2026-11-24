@@ -168,6 +168,8 @@ export const api = {
   regionPeriods: () => req(`/api/region-periods`),
   // record a move ({bus_id, region, moved_on}) — closes the previous period the day
   // before, so nothing already worked changes region
+  // "between these dates the vehicle was in <region>" (preview:true = report the impact only)
+  assignRegion: (p) => req(`/api/region-periods/assign`, { method: "POST", body: JSON.stringify(p) }),
   moveRegion: (p) => req(`/api/region-periods/move`, { method: "POST", body: JSON.stringify(p) }),
   setRegionPeriod: (p) => req(`/api/region-periods`, { method: "PUT", body: JSON.stringify(p) }),
   deleteRegionPeriod: (id) => req(`/api/region-periods/${id}`, { method: "DELETE" }),

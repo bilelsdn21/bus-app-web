@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, downloadBlob } from "../api.js";
+import RegionAssignModal from "./RegionAssignModal.jsx";
 
 const TYPES = ["MICRO", "OTOKAR", "BUS"];
 const REGIONS = ["Sousse", "Djerba"];
@@ -487,6 +488,8 @@ function RegionPeriodsPanel({ readOnly = false }) {
   const [periods, setPeriods] = useState([]);
   const [form, setForm] = useState(null); // {id?, effective_from, effective_to, region}
   const [move, setMove] = useState(null); // {region, moved_on} — record a change of region
+  const [assign, setAssign] = useState(false); // change the region over any date window
+  const [okMsg, setOkMsg] = useState("");
   const [err, setErr] = useState("");
   const [exporting, setExporting] = useState(false);
 
@@ -536,7 +539,14 @@ function RegionPeriodsPanel({ readOnly = false }) {
   return (
     <div className="space-y-4">
       {err && <Err msg={err} />}
+      {okMsg && <div className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">{okMsg}</div>}
       <div className="rounded-2xl bg-white p-4 shadow ring-1 ring-slate-200">
+        <p className="mb-3 text-xs text-slate-400">
+          <b className="text-slate-500">Une erreur ou un changement rétroactif ? Utilisez « 🗺️ Changer sur une période »</b> :
+          choisissez le véhicule, la région et les dates (ex. « les 2 derniers mois »). Les périodes qui se
+          chevauchent sont ajustées automatiquement, les sorties de ces jours suivent la région et tous les
+          totaux se recalculent ; un aperçu chiffré s'affiche avant de confirmer.
+        </p>
         <p className="mb-3 text-xs text-slate-400">
           Un véhicule peut changer de région selon la saison. <b className="text-slate-500">Le véhicule bouge
           aujourd'hui ? Utilisez « ↷ Déplacer »</b> : la période en cours est fermée la veille et la nouvelle
@@ -555,6 +565,10 @@ function RegionPeriodsPanel({ readOnly = false }) {
           </button>
           {!readOnly && (
             <>
+              <button onClick={() => setAssign(true)}
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-700">
+                🗺️ Changer sur une période
+              </button>
               <button onClick={() => setMove({ region: REGIONS.find((r) => r !== bus?.region) || REGIONS[0], moved_on: new Date().toISOString().slice(0, 10) })}
                 className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-amber-600">
                 ↷ Déplacer
@@ -594,6 +608,15 @@ function RegionPeriodsPanel({ readOnly = false }) {
           </tbody>
         </table>
       </div>
+
+      {assign && (
+        <RegionAssignModal buses={buses} bus={bus} onClose={() => setAssign(false)}
+          onDone={(b, r) => {
+            setAssign(false); loadPeriods(); api.buses().then(setBuses).catch(() => {});
+            setOkMsg(`Région mise à jour : ${b?.name || "véhicule"} → ${r}. Le calendrier et les totaux sont recalculés.`);
+            setTimeout(() => setOkMsg(""), 6000);
+          }} />
+      )}
 
       {form && (
         <Modal title={`${form.id ? "Modifier" : "Nouvelle"} période — ${bus?.name || ""}`} onClose={() => setForm(null)} onSave={save} canSave={!!form.effective_from && !!form.region}>

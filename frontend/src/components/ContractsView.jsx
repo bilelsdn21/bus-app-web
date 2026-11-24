@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, downloadBlob } from "../api.js";
 import { fmtTND } from "../colors.js";
 import { useAutoRefresh } from "../useAutoRefresh.js";
+import RegionAssignModal from "./RegionAssignModal.jsx";
 
 const MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jui", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 
@@ -12,6 +13,8 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
   const [fuel, setFuel] = useState([]);
   const [err, setErr] = useState("");
   const [form, setForm] = useState(null); // contract being added/edited
+  const [assign, setAssign] = useState(null); // contract whose region window is being changed
+  const [okMsg, setOkMsg] = useState("");
   const [exporting, setExporting] = useState(false);
 
   const exportExcel = async () => {
@@ -97,6 +100,7 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
       </div>
 
       {err && <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{err}</div>}
+      {okMsg && <div className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{okMsg}</div>}
 
       {/* contract result cards */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -109,6 +113,7 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
               </div>
               <div className="flex gap-2">
                 {c.is_estimated && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Estimé</span>}
+                {!readOnly && <button onClick={() => setAssign(c)} className="-m-1 p-2 text-lg text-slate-400 hover:text-amber-600" title="Changer la région sur ce contrat" aria-label="Changer la région">🗺️</button>}
                 {!readOnly && <button onClick={() => setForm({ id: c.contract_id, start_date: c.start_date, end_date: c.end_date, loyer: c.loyer, label: c.label })} className="-m-1 p-2 text-lg text-slate-400 hover:text-sky-600" title="Modifier">✎</button>}
                 {!readOnly && <button onClick={() => removeContract(c.contract_id)} className="-m-1 p-2 text-lg text-slate-400 hover:text-rose-600" title="Supprimer">🗑</button>}
               </div>
@@ -167,6 +172,17 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
           </table>
         </div>
       </div>
+
+      {assign && (
+        <RegionAssignModal buses={buses} bus={buses.find((b) => String(b.id) === busId)}
+          initial={{ date_from: assign.start_date, date_to: assign.end_date }}
+          onClose={() => setAssign(null)}
+          onDone={(b, r) => {
+            setAssign(null); reload();
+            setOkMsg(`Région mise à jour : ${b?.name || "véhicule"} → ${r}. Le calendrier et les totaux sont recalculés.`);
+            setTimeout(() => setOkMsg(""), 6000);
+          }} />
+      )}
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setForm(null)}>

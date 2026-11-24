@@ -158,6 +158,16 @@ class RegionMoveIn(BaseModel):
     moved_on: date
 
 
+class RegionAssignIn(BaseModel):
+    """"Between these dates the vehicle was in <region>" (date_to empty = from then on).
+    `preview` only reports what would change."""
+    bus_id: int
+    region: str
+    date_from: date
+    date_to: Optional[date] = None
+    preview: bool = False
+
+
 # ---- Rented vehicles (external reinforcement, not part of our fleet) ----
 class RentedVehicleBase(BaseModel):
     name: str
