@@ -15,6 +15,7 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
   const [form, setForm] = useState(null); // contract being added/edited
   const [assign, setAssign] = useState(null); // contract whose region window is being changed
   const [okMsg, setOkMsg] = useState("");
+  const [fuelYear, setFuelYear] = useState(() => new Date().getFullYear()); // fuel grid: any year
   const [exporting, setExporting] = useState(false);
 
   const exportExcel = async () => {
@@ -62,20 +63,27 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
     } catch (e) { setErr(e.message); }
   };
 
-  // Months to show in the fuel grid: last month → +6 ahead, plus any month that has data.
-  const fuelMonths = useMemo(() => {
-    const now = new Date();
-    const base = now.getFullYear() * 12 + now.getMonth(); // linear index of current month
-    let lo = base - 1, hi = base + 6;
-    fuel.forEach((f) => { const n = f.year * 12 + (f.month - 1); if (n < lo) lo = n; if (n > hi) hi = n; });
-    const out = [];
-    for (let n = lo; n <= hi; n++) {
-      const y = Math.floor(n / 12), m = (n % 12) + 1;
-      const f = fuel.find((x) => x.year === y && x.month === m);
-      out.push({ year: y, month: m, estimated: f ? f.estimated : "", actual: f ? f.actual : null });
-    }
-    return out;
-  }, [fuel]);
+  // Fuel grid: pick a year, get its 12 months — every year works the same, past or future,
+  // whether or not anything was entered for it yet.
+  const fuelYears = useMemo(() => {
+    const now = new Date().getFullYear();
+    const ys = [2025, now + 1, ...fuel.map((f) => f.year),
+      ...contracts.flatMap((c) => [Number(c.start_date.slice(0, 4)), Number(c.end_date.slice(0, 4))])];
+    const lo = Math.min(...ys), hi = Math.max(...ys);
+    return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+  }, [fuel, contracts]);
+  const fuelMonths = useMemo(() => MONTHS.map((_, i) => {
+    const month = i + 1, mm = String(month).padStart(2, "0");
+    const first = `${fuelYear}-${mm}-01`;
+    const last = `${fuelYear}-${mm}-${String(new Date(fuelYear, month, 0).getDate()).padStart(2, "0")}`;
+    const f = fuel.find((x) => x.year === fuelYear && x.month === month);
+    return {
+      year: fuelYear, month, estimated: f ? f.estimated : "", actual: f ? f.actual : null,
+      covered: contracts.some((c) => c.start_date <= last && c.end_date >= first), // a contract touches this month
+    };
+  }), [fuel, contracts, fuelYear]);
+  // what the year adds up to: the real amount when entered, else the estimate
+  const fuelTotal = fuelMonths.reduce((t, f) => t + Number(f.actual ?? (f.estimated || 0)), 0);
 
   const bus = buses.find((b) => String(b.id) === String(busId));
 
@@ -141,7 +149,14 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
       {/* fuel per month */}
       <div className="rounded-2xl bg-white p-5 shadow-lg ring-1 ring-slate-200">
         <h2 className="mb-3 font-bold text-[#1a3a5c]">⛽ Carburant mensuel ({bus?.name})</h2>
-        <p className="mb-3 text-xs text-slate-400">Saisissez l'<b>estimation</b> à l'avance pour les mois à venir, puis le <b>réel</b> le 1er du mois suivant. Tapez un montant et cliquez ailleurs pour enregistrer.</p>
+        <p className="mb-3 text-xs text-slate-400">Saisissez l'<b>estimation</b> à l'avance pour les mois à venir, puis le <b>réel</b> le 1er du mois suivant. Tapez un montant et cliquez ailleurs pour enregistrer (videz la case pour effacer).</p>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {fuelYears.map((y) => (
+            <button key={y} onClick={() => setFuelYear(y)}
+              className={`h-9 rounded-full px-4 text-sm font-semibold ${y === fuelYear ? "bg-[#1a3a5c] text-white shadow" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{y}</button>
+          ))}
+          <span className="ml-auto text-xs text-slate-400">Total {fuelYear} : <b className="text-slate-700">{fmtTND(fuelTotal)}</b></span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-slate-400">
@@ -153,7 +168,11 @@ export default function ContractsView({ readOnly = false, initialBusId = null })
                 const isCurrent = f.year === now.getFullYear() && f.month === now.getMonth() + 1;
                 return (
                   <tr key={`${f.year}-${f.month}`} className={`border-t border-slate-100 ${isCurrent ? "bg-sky-50/50" : ""}`}>
-                    <td className="py-2 font-semibold">{MONTHS[f.month - 1]} {f.year}{isCurrent && <span className="ml-1 text-[10px] font-bold uppercase text-sky-500">en cours</span>}</td>
+                    <td className={`py-2 font-semibold ${f.covered ? "" : "text-slate-400"}`}>
+                      {MONTHS[f.month - 1]} {f.year}
+                      {isCurrent && <span className="ml-1 text-[10px] font-bold uppercase text-sky-500">en cours</span>}
+                      {!f.covered && <span className="block text-[10px] font-normal text-slate-400">hors contrat</span>}
+                    </td>
                     {readOnly ? (
                       <>
                         <td className="py-2">{f.estimated ? Number(f.estimated).toLocaleString("fr-FR") : "—"}</td>
@@ -228,7 +247,8 @@ function FuelCell({ value, onSave, placeholder }) {
       type="number" value={v} placeholder={placeholder}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => { if (String(v) !== String(value ?? "")) onSave(v); }}
-      className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-400"
+      min="0" inputMode="decimal"
+      className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-sky-400 sm:w-28"
     />
   );
 }
